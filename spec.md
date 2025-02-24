@@ -172,6 +172,81 @@ The system supports several audio effects that can be applied to steps:
 - **Delay**: Creates echo effects with parameters for delay time and feedback
 - **Distortion**: Adds distortion with a configurable amount
 
+## Parameter Hierarchy and Usage Guidelines
+
+To ensure consistent behavior in the drum machine, the following guidelines should be followed:
+
+### Tempo
+- The `:tempo` parameter should only be specified at the `drum-machine` level
+- It sets the global tempo in beats per minute (BPM)
+- Default: 120 BPM
+
+### Time Signature
+- The `:signature` parameter should only be specified at the `drum-machine` level
+- It sets the number of beats per measure (the top number in a time signature)
+- Currently only supports signatures with 4 as the bottom number (e.g., 4/4, 3/4, 5/4)
+- Default: 4 (for 4/4 time)
+
+### Bars
+- The `:bars` parameter can be specified at both the `arrangement` and `track` levels
+- At the `arrangement` level, it sets the overall loop length for all tracks
+- At the `track` level, it can override the arrangement's bar count for specific tracks
+- If a track has more notes than can fit in its bars, excess notes will be ignored
+- Default: 1 bar
+
+### Time (Steps per Measure)
+- The `:time` parameter is specified at the `track` level
+- It defines how many steps/notes fit within one measure for that track
+- This allows different tracks to have different rhythmic divisions
+- Default: 16 steps per measure
+
+### Note Parameters
+- `:active` - Whether the note triggers a sound (1) or is silent (0)
+- `:pitch` - Pitch adjustment in semitones (affects playback rate)
+- `:volume` - Volume adjustment from -1 (quieter) to 1 (louder)
+
+## Example with Parameters
+
+```lisp
+(drum-machine "example" :tempo 110 :signature 3
+  (arrangement :active 1 :bars 2
+    (track "kick" kick :active 1 :time 6
+      (notes
+        (note :active 1)
+        (note :active 0)
+        (note :active 1)
+        (note :active 0)
+        (note :active 1)
+        (note :active 0)
+      )
+    )
+    (track "hihat" hihat :active 1 :time 12
+      (notes
+        (note :active 1)
+        (note :active 1)
+        (note :active 1)
+        (note :active 1)
+        (note :active 1)
+        (note :active 1)
+        (note :active 1)
+        (note :active 1)
+        (note :active 1)
+        (note :active 1)
+        (note :active 1)
+        (note :active 1)
+      )
+    )
+  )
+)
+```
+
+In this example:
+- The tempo is 110 BPM
+- The time signature is 3/4 (3 beats per measure)
+- The arrangement is 2 bars long
+- The kick track has 6 steps per measure (2 steps per beat)
+- The hihat track has 12 steps per measure (4 steps per beat)
+
 ## Usage Examples
 
 ### Simple Drum Machine Example

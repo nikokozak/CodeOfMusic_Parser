@@ -132,6 +132,8 @@ const parser = {
 
             const data = {
                 name: ast[1],
+                tempo: this.findArgument(ast, ':tempo') || 120,
+                signature: this.findArgument(ast, ':signature') || 4,
                 arrangements: []
             };
 
@@ -154,7 +156,7 @@ const parser = {
                         const trackNode = node[j];
                         if (Array.isArray(trackNode) && trackNode[0] === 'track') {
                             const trackActive = this.findArgument(trackNode, ':active') === 1;
-                            const trackBars = this.findArgument(trackNode, ':bars') || 1;
+                            const trackBars = this.findArgument(trackNode, ':bars') || arrangement.bars;
                             const time = this.findArgument(trackNode, ':time') || 16;
 
                             const track = {

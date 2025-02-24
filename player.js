@@ -38,7 +38,9 @@ const player = {
         this.trackStates.clear();
         
         // Set default tempo and loop length
-        this.transport.bpm.value = 120;
+        this.transport.bpm.value = data.tempo || 120;
+        
+        // Default to 1 measure loop
         this.transport.setLoopPoints(0, "1m");
         this.transport.loop = true;
         
@@ -107,6 +109,21 @@ const player = {
         this.parts.forEach(part => part.dispose());
         this.parts.clear();
         this.trackStates.clear();
+        
+        // Set tempo from drum machine data
+        if (data.tempo) {
+            this.transport.bpm.value = data.tempo;
+            console.log(`Setting tempo to ${data.tempo} BPM`);
+        }
+        
+        // Set time signature if provided
+        const timeSignature = data.signature || 4;
+        console.log(`Using time signature: ${timeSignature}/4`);
+        
+        // Set arrangement loop length based on bars
+        const arrangementBars = activeArrangement.bars || 1;
+        this.transport.setLoopPoints(0, `${arrangementBars}m`);
+        console.log(`Setting arrangement loop length to ${arrangementBars} bars`);
 
         // Create parts for each track
         activeArrangement.tracks.forEach(track => {
@@ -117,18 +134,37 @@ const player = {
             
             const events = [];
             
+            // Calculate how many notes we can fit in the track based on bars and time signature
+            // time parameter represents subdivisions per measure
+            const notesPerMeasure = track.time || 16;
+            const totalNotes = notesPerMeasure * (track.bars || arrangementBars);
+            
             // Convert notes to timed events
             track.notes.forEach((note, index) => {
+                // Skip notes that exceed the track's length
+                if (index >= totalNotes) {
+                    console.warn(`Note at index ${index} exceeds track length (${totalNotes}), skipping`);
+                    return;
+                }
+                
                 if (note.active) {
-                    // Calculate time based on the time signature
-                    // time parameter represents subdivisions per beat
-                    const subdivision = 1 / (track.time / 4); // Convert to quarter note divisions
-                    const beat = Math.floor(index * subdivision);
-                    const remainder = (index * subdivision) % 1;
+                    // Calculate time based on the time signature and track's time parameter
+                    const beatsPerMeasure = timeSignature;
+                    const subdivision = beatsPerMeasure / notesPerMeasure;
+                    
+                    // Calculate which measure this note belongs to
+                    const measure = Math.floor(index / notesPerMeasure);
+                    
+                    // Calculate position within the measure
+                    const positionInMeasure = index % notesPerMeasure;
+                    
+                    // Calculate beat and sixteenth
+                    const beat = Math.floor(positionInMeasure * subdivision);
+                    const remainder = (positionInMeasure * subdivision) % 1;
                     const sixteenth = Math.floor(remainder * 4);
                     
-                    const time = `0:${beat}:${sixteenth}`;
-                    console.log(`Note ${index} time: ${time} (time: ${track.time}, subdivision: ${subdivision})`);
+                    const time = `${measure}:${beat}:${sixteenth}`;
+                    console.log(`Note ${index} time: ${time} (measure: ${measure}, beat: ${beat}, sixteenth: ${sixteenth})`);
                     
                     events.push({
                         time,
@@ -166,7 +202,12 @@ const player = {
             }, events);
 
             part.loop = true;
-            part.loopEnd = `${track.bars || 1}m`;
+            
+            // Set the loop end based on the arrangement's bars
+            // This ensures all tracks loop together with the arrangement
+            part.loopEnd = `${arrangementBars}m`;
+            console.log(`Setting track ${track.name} loop length to ${arrangementBars}m`);
+            
             this.parts.set(track.name, part);
         });
     },
@@ -196,6 +237,15 @@ const player = {
             return;
         }
 
+        // Update tempo if it changed
+        if (data.tempo) {
+            this.transport.bpm.value = data.tempo;
+        }
+        
+        // Update arrangement loop length if bars changed
+        const arrangementBars = activeArrangement.bars || 1;
+        this.transport.setLoopPoints(0, `${arrangementBars}m`);
+        
         // If same arrangement, just update tracks
         console.log('Updating parts with new data');
         activeArrangement.tracks.forEach(track => {
@@ -214,17 +264,41 @@ const player = {
             }
 
             if (part) {
+                // Update loop end to match arrangement bars
+                part.loopEnd = `${arrangementBars}m`;
+                
                 // Update events
                 part.clear();
+                
+                // Calculate how many notes we can fit in the track based on bars and time signature
+                const timeSignature = data.signature || 4;
+                const notesPerMeasure = track.time || 16;
+                const totalNotes = notesPerMeasure * (track.bars || arrangementBars);
+                
                 track.notes.forEach((note, index) => {
+                    // Skip notes that exceed the track's length
+                    if (index >= totalNotes) {
+                        return;
+                    }
+                    
                     if (note.active) {
-                        // Calculate time based on the time signature
-                        const subdivision = 1 / (track.time / 4);
-                        const beat = Math.floor(index * subdivision);
-                        const remainder = (index * subdivision) % 1;
+                        // Calculate time based on the time signature and track's time parameter
+                        const beatsPerMeasure = timeSignature;
+                        const subdivision = beatsPerMeasure / notesPerMeasure;
+                        
+                        // Calculate which measure this note belongs to
+                        const measure = Math.floor(index / notesPerMeasure);
+                        
+                        // Calculate position within the measure
+                        const positionInMeasure = index % notesPerMeasure;
+                        
+                        // Calculate beat and sixteenth
+                        const beat = Math.floor(positionInMeasure * subdivision);
+                        const remainder = (positionInMeasure * subdivision) % 1;
                         const sixteenth = Math.floor(remainder * 4);
                         
-                        const time = `0:${beat}:${sixteenth}`;
+                        const time = `${measure}:${beat}:${sixteenth}`;
+                        
                         part.add({
                             time,
                             sample: track.sample,
