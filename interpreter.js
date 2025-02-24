@@ -8,8 +8,10 @@
  * @returns {Function} Environment lookup function
  */
 const createEnv = (bindings = {}, parent = null) => {
+    console.log('Creating environment with bindings:', bindings);
     // Return a lookup function that closes over the bindings and parent
     return name => {
+        console.log('Looking up', name, 'in bindings:', bindings);
         if (name in bindings) {
             return bindings[name];
         }
@@ -107,33 +109,57 @@ const processArgs = (args) => {
  * @returns {*} The result of evaluation
  */
 const evaluate = (expr, env) => {
-    // Numbers and strings evaluate to themselves
-    if (typeof expr === 'number' || typeof expr === 'string') {
+    // Numbers evaluate to themselves
+    if (typeof expr === 'number') {
         return expr;
+    }
+
+    // Strings that start with " are literals, others are symbols
+    if (typeof expr === 'string') {
+        console.log('Looking up variable:', expr);
+        const result = expr.startsWith('"') ? expr : env(expr);
+        console.log('Result:', result);
+        return result;
     }
 
     // Arrays represent function calls or special forms
     if (Array.isArray(expr)) {
         if (expr.length === 0) {
-            return null;
+            return [];
         }
 
         const [first, ...rest] = expr;
 
         // Handle special forms
         switch (first) {
+            case 'quote': {
+                // Quote returns its argument unevaluated
+                return rest[0];
+            }
+
             case 'let': {
-                const [bindings, ...body] = rest;
-                const newEnv = bindings.reduce((acc, [name, valueExpr]) => {
+                // Get the bindings array (should be quoted)
+                const [quotedBindings, ...body] = rest;
+                
+                // Handle the quoted bindings list
+                const bindingPairs = quotedBindings[0] === 'quote' ? 
+                    quotedBindings[1] : 
+                    evaluate(quotedBindings, env);
+                
+                // Create new environment with all bindings
+                const newEnv = bindingPairs.reduce((acc, binding) => {
+                    const [name, valueExpr] = binding;
                     const value = evaluate(valueExpr, acc);
                     return extendEnv(acc, { [name]: value });
                 }, env);
+
+                // Evaluate body expressions in sequence
                 return body.reduce((_, expr) => evaluate(expr, newEnv), null);
             }
 
             case 'lambda': {
                 const [params, ...body] = rest;
-                return (...args) => {
+                return function(...args) {
                     const newEnv = params.reduce((acc, param, i) => 
                         extendEnv(acc, { [param]: args[i] }), env);
                     return body.reduce((_, expr) => evaluate(expr, newEnv), null);
@@ -166,8 +192,7 @@ const evaluate = (expr, env) => {
         }
     }
 
-    // Look up variables in the environment
-    return env(expr);
+    throw new Error(`Cannot evaluate expression: ${expr}`);
 };
 
 /**
@@ -185,5 +210,14 @@ const interpret = (ast) => {
     return ast.map(expr => evaluate(expr, globalEnv));
 };
 
-// Export the interpreter interface
-window.interpret = interpret; 
+// Export the interpreter interface in a more functional way
+const interpreter = {
+    interpret,
+    evaluate,
+    createEnv,
+    extendEnv,
+    primitives
+};
+
+// Make it available to the window
+Object.assign(window, interpreter); 

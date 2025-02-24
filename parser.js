@@ -10,123 +10,101 @@ class ParserError extends Error {
 }
 
 // Remove comments and normalize whitespace
-const preprocess = (input) => {
-    // Remove comments (everything after ; until newline)
-    const noComments = input.replace(/;[^\n]*/g, '');
-    // Normalize whitespace (convert all whitespace to single space)
-    return noComments.trim().replace(/\s+/g, ' ');
-};
+const preprocess = input => 
+    input.replace(/;[^\n]*/g, '')  // Remove comments
+         .trim()
+         .replace(/\s+/g, ' ');    // Normalize whitespace
 
 // Tokenizer - breaks input string into individual tokens
-const tokenize = (input) => {
-    const processed = preprocess(input);
+const tokenize = input => {
     const tokens = [];
     let i = 0;
+    const chars = preprocess(input);
     
-    while (i < processed.length) {
-        let char = processed[i];
+    while (i < chars.length) {
+        const char = chars[i];
         
-        // Handle parentheses
-        if (char === '(' || char === ')') {
+        // Skip spaces
+        if (char === ' ') { i++; continue; }
+        
+        // Handle quotes, parens, and brackets
+        if ("'()[]".includes(char)) {
             tokens.push(char);
             i++;
             continue;
         }
         
         // Handle strings
-        if (char === '"' || char === "'") {
-            const quote = char;
-            let str = quote;
-            i++;
-            
-            while (i < processed.length && processed[i] !== quote) {
-                str += processed[i];
-                i++;
+        if (char === '"') {
+            let str = '';
+            i++; // Skip opening quote
+            while (i < chars.length && chars[i] !== '"') {
+                str += chars[i++];
             }
-            
-            if (i >= processed.length) {
-                throw new ParserError('Unterminated string literal');
-            }
-            
-            str += quote;
-            tokens.push(str);
-            i++;
+            if (i >= chars.length) throw 'Unterminated string';
+            tokens.push(`"${str}"`);
+            i++; // Skip closing quote
             continue;
         }
         
-        // Handle symbols and numbers
-        if (char !== ' ') {
-            let token = '';
-            while (i < processed.length && !'() '.includes(processed[i])) {
-                token += processed[i];
-                i++;
-            }
-            
-            // Convert numbers if possible
-            const num = Number(token);
-            tokens.push(isNaN(num) ? token : num);
-            continue;
+        // Handle atoms (symbols and numbers)
+        let atom = '';
+        while (i < chars.length && !' \'()[]"'.includes(chars[i])) {
+            atom += chars[i++];
         }
-        
-        i++;
+        tokens.push(isNaN(atom) ? atom : Number(atom));
     }
     
     return tokens;
 };
 
 // Parser - converts tokens into nested arrays
-const parse = (tokens) => {
-    const result = [];
-    let i = 0;
-    
+const parse = tokens => {
     const parseExpr = () => {
-        const expr = [];
+        if (tokens.length === 0) throw 'Unexpected EOF';
         
-        while (i < tokens.length) {
-            const token = tokens[i];
-            
-            if (token === '(') {
-                i++;
-                expr.push(parseExpr());
-            } else if (token === ')') {
-                i++;
-                return expr;
-            } else {
-                i++;
-                expr.push(token);
-            }
+        const token = tokens.shift();
+        
+        // Handle quotes
+        if (token === "'") {
+            const quoted = parseExpr();
+            return ['quote', quoted];
         }
         
-        throw new ParserError('Missing closing parenthesis');
+        // Handle lists
+        if (token === '(' || token === '[') {
+            const list = [];
+            while (tokens.length > 0 && tokens[0] !== ')' && tokens[0] !== ']') {
+                list.push(parseExpr());
+            }
+            if (tokens.length === 0) throw 'Missing closing bracket';
+            tokens.shift(); // Remove closing bracket
+            return list;
+        }
+        
+        // Handle atoms
+        if (token === ')' || token === ']') throw 'Unexpected closing bracket';
+        return token;
     };
     
-    while (i < tokens.length) {
-        const token = tokens[i];
-        
-        if (token === '(') {
-            i++;
-            result.push(parseExpr());
-        } else if (token === ')') {
-            throw new ParserError('Unexpected closing parenthesis');
-        } else {
-            i++;
-            result.push(token);
-        }
+    const result = [];
+    while (tokens.length > 0) {
+        result.push(parseExpr());
     }
-    
     return result;
 };
 
-// Main parse function that combines tokenize and parse steps
-const parseProgram = (input) => {
+// Main parse function
+const parseProgram = input => {
     try {
-        const tokens = tokenize(input);
-        return parse(tokens);
+        const ast = parse(tokenize(input));
+        console.log('Generated AST:', JSON.stringify(ast, null, 2));
+        return ast;
     } catch (e) {
-        if (e instanceof ParserError) {
-            console.error('Parser Error:', e.message);
-            return null;
-        }
-        throw e;  // Re-throw unexpected errors
+        console.error('Parse error:', e);
+        return null;
     }
-}; 
+};
+
+// Export the parser interface
+window.parseProgram = parseProgram; 

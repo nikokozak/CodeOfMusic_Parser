@@ -13,10 +13,11 @@
     <script src="codejar.js"></script>
     <script src="linenumbers.js"></script>
     
-    <!-- Our application code -->
-    <script defer src="parser.js"></script>
-    <script defer src="editor.js"></script>
-    <script defer src="main.js"></script>
+    <!-- Our application code - order matters! -->
+    <script src="parser.js"></script>
+    <script src="interpreter.js"></script>
+    <script src="editor.js"></script>
+    <script src="main.js"></script>
     <style>
         body {
             margin: 0;
