@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code of Music Parser Test</title>
+    <!-- Third-party dependencies -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    
+    <!-- Our application code - order matters! -->
+    <script src="parser.js"></script>
+    <script src="interpreter.js"></script>
+    <script src="main.js"></script>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: #1e1e1e;
+            font-family: monospace;
+            gap: 20px;
+            padding: 20px;
+            box-sizing: border-box;
+            color: white;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            background: #4a4a4a;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #5a5a5a;
+        }
+        #test-audio {
+            background: #2a6b2a;
+        }
+        #test-audio:hover {
+            background: #3a7b3a;
+        }
+        pre {
+            background: #2d2d2d;
+            padding: 20px;
+            border-radius: 5px;
+            width: 80%;
+            overflow: auto;
+            max-height: 400px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Code of Music Parser Test</h1>
+    <pre id="code-display"></pre>
+    <div class="controls">
+        <button id="test-audio">Test Audio</button>
+        <button id="run-test">Run Test Code</button>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Load the test code
+            const response = await fetch('test.lisp');
+            const testCode = await response.text();
+            
+            // Display the code
+            document.getElementById('code-display').textContent = testCode;
+            
+            // Add test audio button handler
+            document.getElementById('test-audio').addEventListener('click', async () => {
+                try {
+                    await ensureAudioContext();
+                    testAudio();
+                } catch (err) {
+                    console.error('Error testing audio:', err);
+                }
+            });
+            
+            // Add run test button handler
+            document.getElementById('run-test').addEventListener('click', async () => {
+                try {
+                    await ensureAudioContext();
+                    executeCode(testCode);
+                } catch (err) {
+                    console.error('Error running test code:', err);
+                }
+            });
+        });
+    </script>
+</body>
+</html> 

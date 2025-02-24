@@ -38,7 +38,7 @@
             border-radius: 6px;
             padding: 16px;
             width: 80vw;
-            height: 80vh;
+            height: 70vh;
             display: flex;
             flex-direction: row;
         }
@@ -66,7 +66,11 @@
             line-height: 1.5;
             min-width: 40px;
         }
-        #run {
+        .controls {
+            display: flex;
+            gap: 10px;
+        }
+        #run, #test-audio {
             background: #4a4a4a;
             color: #fff;
             border: none;
@@ -76,13 +80,24 @@
             font-family: monospace;
             font-size: 14px;
         }
-        #run:hover {
+        #run:hover, #test-audio:hover {
             background: #5a5a5a;
+        }
+        #test-audio {
+            background: #2a6b2a;
+        }
+        #test-audio:hover {
+            background: #3a7b3a;
         }
     </style>
 </head>
 <body>
-    <div class="editor" id="editor" contenteditable spellcheck="false"></div>
-    <button id="run">Run (Ctrl+Enter)</button>
+    <div class="wrapper">
+        <div class="editor" id="editor" contenteditable spellcheck="false"></div>
+    </div>
+    <div class="controls">
+        <button id="test-audio">Test Audio</button>
+        <button id="run">Run (Ctrl+Enter)</button>
+    </div>
 </body>
 </html> 
