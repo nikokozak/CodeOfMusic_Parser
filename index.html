@@ -15,8 +15,7 @@
     
     <!-- Our application code - order matters! -->
     <script src="parser.js"></script>
-    <script src="interpreter.js"></script>
-    <script src="editor.js"></script>
+    <script src="player.js"></script>
     <script src="main.js"></script>
     <style>
         body {
@@ -89,10 +88,33 @@
         #test-audio:hover {
             background: #3a7b3a;
         }
+        .error-message {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: #ff5555;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 4px;
+            z-index: 1000;
+            max-width: 80vw;
+            word-wrap: break-word;
+        }
+        .status-message {
+            position: fixed; 
+            bottom: 20px;
+            right: 20px;
+            background-color: #55aa55;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 4px;
+            z-index: 1000;
+        }
     </style>
 </head>
 <body>
     <div class="wrapper">
+        <div class="line-numbers"></div>
         <div class="editor" id="editor" contenteditable spellcheck="false"></div>
     </div>
     <div class="controls">

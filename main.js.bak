@@ -193,14 +193,6 @@ function showError(message) {
     const errorElement = document.createElement('div');
     errorElement.className = 'error-message';
     errorElement.textContent = message;
-    errorElement.style.position = 'fixed';
-    errorElement.style.bottom = '20px';
-    errorElement.style.right = '20px';
-    errorElement.style.backgroundColor = '#ff5555';
-    errorElement.style.color = 'white';
-    errorElement.style.padding = '10px 20px';
-    errorElement.style.borderRadius = '4px';
-    errorElement.style.zIndex = '1000';
     
     // Remove any existing error messages
     hideError();
@@ -222,14 +214,6 @@ function showMessage(message) {
     const messageElement = document.createElement('div');
     messageElement.className = 'status-message';
     messageElement.textContent = message;
-    messageElement.style.position = 'fixed';
-    messageElement.style.bottom = '20px';
-    messageElement.style.right = '20px';
-    messageElement.style.backgroundColor = '#55aa55';
-    messageElement.style.color = 'white';
-    messageElement.style.padding = '10px 20px';
-    messageElement.style.borderRadius = '4px';
-    messageElement.style.zIndex = '1000';
     
     // Add the message
     document.body.appendChild(messageElement);
@@ -254,3 +238,4 @@ window.stopPlayback = () => {
         showMessage('Playback stopped');
     }
 };
+

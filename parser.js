@@ -35,208 +35,176 @@ const getLineAndColumn = (input, position) => {
  */
 const preprocess = input => 
     input.replace(/;[^\n]*/g, '')  // Remove comments
-         .trim()
-         .replace(/\s+/g, ' ');    // Normalize whitespace
+         .trim();
 
-/**
- * Tokenize the input string into individual tokens
- * @param {string} input - The preprocessed input string
- * @returns {Array} Array of tokens and their position information
- */
-const tokenize = input => {
-    const tokens = [];
-    let i = 0;
-    const chars = preprocess(input);
-    const originalInput = input; // Keep original for error reporting
-    
-    while (i < chars.length) {
-        const char = chars[i];
-        const position = i;
-        
-        // Skip spaces
-        if (char === ' ') { i++; continue; }
-        
-        // Handle quotes, parens, and brackets
-        if ("'()[]".includes(char)) {
-            tokens.push({
-                value: char,
-                position,
-                ...getLineAndColumn(originalInput, position)
-            });
-            i++;
-            continue;
+// Parser object with methods for parsing the Lisp-like syntax
+const parser = {
+    // Tokenize input string into array of tokens
+    tokenize(input) {
+        try {
+            return preprocess(input)
+                .replace(/[()]/g, ' $& ')
+                .trim()
+                .split(/\s+/)
+                .filter(token => token.length > 0);
+        } catch (e) {
+            const { line, column } = getLineAndColumn(input, 0);
+            throw new ParserError(`Tokenization error: ${e.message}`, line, column, input.slice(0, 20) + '...');
         }
-        
-        // Handle strings
-        if (char === '"') {
-            let str = '';
-            const startPos = i;
-            i++; // Skip opening quote
-            
-            while (i < chars.length && chars[i] !== '"') {
-                // Handle escaped characters
-                if (chars[i] === '\\' && i + 1 < chars.length) {
-                    i++; // Skip the backslash
-                    // Handle common escape sequences
-                    if (chars[i] === 'n') str += '\n';
-                    else if (chars[i] === 't') str += '\t';
-                    else str += chars[i]; // Other escaped chars (like " or \)
-                    i++;
+    },
+
+    // Parse tokens into nested structure
+    parse(input) {
+        try {
+            const tokens = this.tokenize(input);
+            const ast = [];
+            let current = ast;
+            const stack = [current];
+            let position = 0;
+
+            tokens.forEach(token => {
+                if (token === '(') {
+                    const newList = [];
+                    current.push(newList);
+                    stack.push(current);
+                    current = newList;
+                } else if (token === ')') {
+                    if (stack.length <= 1) {
+                        const { line, column } = getLineAndColumn(input, position);
+                        throw new ParserError("Unexpected closing parenthesis", line, column, input.slice(position - 10, position + 10));
+                    }
+                    current = stack.pop();
                 } else {
-                    str += chars[i++];
+                    // Handle strings with or without quotes
+                    if (token.startsWith('"') && token.endsWith('"')) {
+                        current.push(token.slice(1, -1));
+                    } else if (!isNaN(token)) {
+                        current.push(Number(token));
+                    } else {
+                        current.push(token);
+                    }
                 }
-            }
-            
-            if (i >= chars.length) {
-                const { line, column } = getLineAndColumn(originalInput, startPos);
-                throw new ParserError('Unterminated string', line, column, 
-                    `"${str.slice(0, 10)}${str.length > 10 ? '...' : ''}"`);
-            }
-            
-            // Store the string value without quotes, but mark it as a string type
-            tokens.push({
-                value: str, // Store without quotes
-                type: 'string', // Mark as string type
-                position: startPos,
-                ...getLineAndColumn(originalInput, startPos)
+                position += token.length + 1; // +1 for the space
             });
-            i++; // Skip closing quote
-            continue;
-        }
-        
-        // Handle atoms (symbols and numbers)
-        let atom = '';
-        const atomStartPos = i;
-        
-        while (i < chars.length && !' \'()[]"'.includes(chars[i])) {
-            atom += chars[i++];
-        }
-        
-        tokens.push({
-            value: isNaN(atom) ? atom : Number(atom),
-            type: isNaN(atom) ? 'symbol' : 'number',
-            position: atomStartPos,
-            ...getLineAndColumn(originalInput, atomStartPos)
-        });
-    }
-    
-    return tokens;
-};
 
-/**
- * Parse tokens into a nested AST
- * @param {Array} tokens - Array of tokens from the tokenizer
- * @param {string} originalInput - Original input for error reporting
- * @returns {Array} The parsed AST
- */
-const parse = (tokens, originalInput) => {
-    let position = 0;
-    
-    const parseExpr = () => {
-        if (position >= tokens.length) {
-            const lastToken = tokens[tokens.length - 1];
-            throw new ParserError('Unexpected end of input', 
-                lastToken ? lastToken.line : 1, 
-                lastToken ? lastToken.column : 0);
-        }
-        
-        const token = tokens[position++];
-        
-        // Handle quotes
-        if (token.value === "'") {
-            const quoted = parseExpr();
-            return ['quote', quoted];
-        }
-        
-        // Handle lists
-        if (token.value === '(' || token.value === '[') {
-            const openBracket = token.value;
-            const closeBracket = openBracket === '(' ? ')' : ']';
-            const list = [];
-            
-            while (position < tokens.length && 
-                   tokens[position].value !== ')' && 
-                   tokens[position].value !== ']') {
-                list.push(parseExpr());
+            if (stack.length > 1) {
+                const { line, column } = getLineAndColumn(input, input.length);
+                throw new ParserError("Missing closing parenthesis", line, column, input.slice(input.length - 20));
             }
-            
-            if (position >= tokens.length) {
-                throw new ParserError(`Missing closing ${closeBracket}`, 
-                    token.line, token.column,
-                    `Opening ${openBracket} at line ${token.line}, column ${token.column}`);
-            }
-            
-            const closeToken = tokens[position];
-            if (closeToken.value !== closeBracket) {
-                throw new ParserError(
-                    `Mismatched brackets: expected '${closeBracket}' but got '${closeToken.value}'`,
-                    closeToken.line, closeToken.column,
-                    `Opening ${openBracket} at line ${token.line}, column ${token.column}`
-                );
-            }
-            
-            position++; // Remove closing bracket
-            return list;
-        }
-        
-        // Handle closing brackets outside of lists
-        if (token.value === ')' || token.value === ']') {
-            throw new ParserError(`Unexpected ${token.value}`, 
-                token.line, token.column);
-        }
-        
-        // For string literals, wrap them to distinguish from symbols
-        if (token.type === 'string') {
-            return { type: 'string', value: token.value };
-        }
-        
-        // For numbers and symbols, return the value directly
-        if (token.type === 'number') {
-            return token.value;
-        }
-        
-        // For symbols, return the value directly
-        return token.value;
-    };
-    
-    const result = [];
-    try {
-        while (position < tokens.length) {
-            result.push(parseExpr());
-        }
-        return result;
-    } catch (e) {
-        if (e instanceof ParserError) {
-            throw e; // Re-throw custom parser errors
-        } else {
-            // Convert generic errors to ParserError with position info
-            const token = position < tokens.length ? tokens[position] : 
-                (tokens.length > 0 ? tokens[tokens.length - 1] : { line: 1, column: 1 });
-            throw new ParserError(`Parse error: ${e.message}`, token.line, token.column);
-        }
-    }
-};
 
-/**
- * Main parse function
- * @param {string} input - The input code to parse
- * @returns {Array|null} The parsed AST or null if there was an error
- */
-const parseProgram = input => {
-    try {
-        const tokens = tokenize(input);
-        const ast = parse(tokens, input);
-        console.log('Generated AST:', JSON.stringify(ast, null, 2));
-        return ast;
-    } catch (e) {
-        if (e instanceof ParserError) {
-            console.error(`Parse error: ${e.message}`);
-        } else {
-            console.error('Unexpected error during parsing:', e);
+            return ast[0];
+        } catch (e) {
+            if (e instanceof ParserError) throw e;
+            
+            const { line, column } = getLineAndColumn(input, 0);
+            throw new ParserError(`Parsing error: ${e.message}`, line, column, input.slice(0, 20) + '...');
+        }
+    },
+
+    // Find a section in a node by its name
+    findSection(node, name) {
+        for (let i = 0; i < node.length; i++) {
+            if (Array.isArray(node[i]) && node[i][0] === name) {
+                return node[i];
+            }
         }
         return null;
+    },
+
+    // Find argument value in a node
+    findArgument(node, argName) {
+        for (let i = 0; i < node.length; i++) {
+            if (node[i] === argName && i + 1 < node.length) {
+                // Convert numeric values
+                const value = node[i + 1];
+                return isNaN(value) ? value : Number(value);
+            }
+        }
+        return null;
+    },
+
+    // Extract drum machine data from AST
+    extractData(ast) {
+        try {
+            if (!ast || ast[0] !== 'drum-machine') {
+                throw new Error('Invalid drum machine syntax: must start with (drum-machine ...)');
+            }
+
+            const data = {
+                name: ast[1],
+                arrangements: []
+            };
+
+            // Find arrangements
+            for (let i = 2; i < ast.length; i++) {
+                const node = ast[i];
+                if (Array.isArray(node) && node[0] === 'arrangement') {
+                    const isActive = this.findArgument(node, ':active') === 1;
+                    const bars = this.findArgument(node, ':bars') || 1;
+
+                    const arrangement = {
+                        id: `arr_${i}`,
+                        active: isActive,
+                        bars: bars,
+                        tracks: []
+                    };
+
+                    // Find tracks in arrangement
+                    for (let j = 2; j < node.length; j++) {
+                        const trackNode = node[j];
+                        if (Array.isArray(trackNode) && trackNode[0] === 'track') {
+                            const trackActive = this.findArgument(trackNode, ':active') === 1;
+                            const trackBars = this.findArgument(trackNode, ':bars') || 1;
+                            const time = this.findArgument(trackNode, ':time') || 16;
+
+                            const track = {
+                                name: trackNode[1],
+                                sample: trackNode[2],
+                                active: trackActive !== null ? trackActive : true,
+                                notes: [],
+                                bars: trackBars,
+                                time: time
+                            };
+
+                            // Find notes section dynamically
+                            const notesNode = this.findSection(trackNode, 'notes');
+                            if (!notesNode) {
+                                throw new Error(`Invalid track syntax: missing notes section in track ${trackNode[1]}`);
+                            }
+
+                            for (let k = 1; k < notesNode.length; k++) {
+                                const noteNode = notesNode[k];
+                                if (Array.isArray(noteNode) && noteNode[0] === 'note') {
+                                    const noteActive = this.findArgument(noteNode, ':active') === 1;
+                                    const notePitch = this.findArgument(noteNode, ':pitch') || 0;
+                                    const noteVolume = this.findArgument(noteNode, ':volume') || 0;
+                                    
+                                    track.notes.push({
+                                        active: noteActive !== null ? noteActive : false,
+                                        pitch: notePitch,
+                                        volume: noteVolume
+                                    });
+                                }
+                            }
+
+                            arrangement.tracks.push(track);
+                        }
+                    }
+
+                    data.arrangements.push(arrangement);
+                }
+            }
+
+            return data;
+        } catch (e) {
+            if (e instanceof ParserError) throw e;
+            
+            throw new Error(`Invalid drum machine syntax: ${e.message}`);
+        }
     }
 };
 
-// Export the parser interface
-window.parseProgram = parseProgram; 
+// Export the parser for use in other modules
+if (typeof module !== 'undefined') {
+    module.exports = parser;
+} 
