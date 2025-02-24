@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code of Music Parser</title>
+    <!-- Third-party dependencies -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    
+    <!-- Local CodeJar files -->
+    <script src="codejar.js"></script>
+    <script src="linenumbers.js"></script>
+    
+    <!-- Our application code -->
+    <script defer src="parser.js"></script>
+    <script defer src="editor.js"></script>
+    <script defer src="main.js"></script>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: #1e1e1e;
+            font-family: monospace;
+            gap: 20px;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .wrapper {
+            position: relative;
+            background: #2d2d2d;
+            border-radius: 6px;
+            padding: 16px;
+            width: 80vw;
+            height: 80vh;
+            display: flex;
+            flex-direction: row;
+        }
+        .editor {
+            background: transparent;
+            color: #fff;
+            padding: 0 16px;
+            flex: 1;
+            height: 100%;
+            overflow: auto;
+            position: relative;
+            outline: none;
+            white-space: pre;
+            box-sizing: border-box;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .line-numbers {
+            color: #666;
+            padding-right: 16px;
+            white-space: pre;
+            text-align: right;
+            user-select: none;
+            font-size: 14px;
+            line-height: 1.5;
+            min-width: 40px;
+        }
+        #run {
+            background: #4a4a4a;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        #run:hover {
+            background: #5a5a5a;
+        }
+    </style>
+</head>
+<body>
+    <div class="editor" id="editor" contenteditable spellcheck="false"></div>
+    <button id="run">Run (Ctrl+Enter)</button>
+</body>
+</html> 
