@@ -48,6 +48,10 @@ const primitives = {
     '>': (args, _env) => args.every((v, i, arr) => i === 0 || arr[i-1] > v),
 
     // Music primitives
+    'beat-machine': (args, _env) => {
+        
+    },
+
     'note': (args, _env) => {
         const [pitch, duration = 1] = args;
         return {
@@ -182,12 +186,24 @@ const evaluate = (expr, env) => {
                 // Process arguments, handling both regular and named args
                 const { regularArgs, namedArgs } = processArgs(rest);
                 const evaluatedArgs = regularArgs.map(arg => evaluate(arg, env));
+                const evaluatedNamedArgs = Object.fromEntries(
+                    Object.entries(namedArgs).map(([k, v]) => [k, evaluate(v, env)])
+                );
                 
                 if (typeof fn !== 'function') {
                     throw new Error(`${first} is not a function`);
                 }
+
+                // Check if function accepts named args by looking at parameter length
+                if (Object.keys(evaluatedNamedArgs).length > 0 && fn.length < 3) {
+                    throw new Error(
+                        `Function '${first}' does not accept named arguments, but received: ${
+                            Object.keys(evaluatedNamedArgs).join(', ')
+                        }`
+                    );
+                }
                 
-                return fn(evaluatedArgs, env, namedArgs);
+                return fn(evaluatedArgs, env, evaluatedNamedArgs);
             }
         }
     }
