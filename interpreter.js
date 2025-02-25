@@ -185,6 +185,32 @@ function musicPrimitives() {
     },
 
     /**
+     * Creates a synth event for Tone.js synths
+     * @param {Array} args - [synthType, note, duration]
+     * @param {Function} _env - Environment (unused)
+     * @param {Object} namedArgs - Named arguments like :velocity, :options
+     * @returns {Object} Synth event object
+     */
+    'synth': (args, _env, namedArgs = {}) => {
+      const [synthType, note, duration = '8n'] = args;
+      const noteValue = extractValue(note);
+      
+      // Handle arrays of notes (chords)
+      const processedNote = Array.isArray(noteValue) ? 
+        noteValue.map(n => typeof n === 'string' ? n : extractValue(n)) : 
+        noteValue;
+      
+      return {
+        type: 'synth',
+        synthType: extractValue(synthType),
+        note: processedNote,
+        duration: extractValue(duration),
+        velocity: namedArgs.velocity ? extractValue(namedArgs.velocity) : 0.7,
+        options: namedArgs.options ? extractValue(namedArgs.options) : {}
+      };
+    },
+
+    /**
      * Creates a chord event
      * @param {Array} args - [notes, duration]
      * @param {Function} _env - Environment (unused)
@@ -538,7 +564,7 @@ const evalApplication = (expr, env) => {
   // Music primitives and certain other functions always accept named args
   const musicPrimitivesList = [
     'note', 'chord', 'sequence', 'parallel', 'beat-machine', 
-    'drum-machine', 'arrangement', 'track', 'step', 'effect'
+    'drum-machine', 'arrangement', 'track', 'step', 'effect', 'synth'
   ];
   
   const acceptsNamedArgs = 
@@ -576,6 +602,14 @@ const evaluate = (expr, env) => {
       }
       if (expr.type === 'symbol') {
         return env(expr.value);
+      }
+      // Handle direct synth playback
+      if (expr.type === 'synth') {
+        // Trigger synth playback if the player is available
+        if (window.player && typeof window.player.playSynth === 'function') {
+          window.player.playSynth(expr);
+        }
+        return expr;
       }
     }
 

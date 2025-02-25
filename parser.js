@@ -117,9 +117,11 @@ const parser = {
             if (node[i] === argName && i + 1 < node.length) {
                 // Convert numeric values
                 const value = node[i + 1];
+                console.log(`Found argument ${argName} with value:`, value);
                 return isNaN(value) ? value : Number(value);
             }
         }
+        console.log(`Argument ${argName} not found in node`);
         return null;
     },
 
@@ -172,6 +174,19 @@ const parser = {
                                 volume: trackVolume
                             };
 
+                            // Check if this is a synth track
+                            const synthType = this.findArgument(trackNode, ':synth');
+                            console.log(`Checking for synth in track ${trackNode[1]}, found: ${synthType}`);
+                            
+                            if (synthType) {
+                                track.isSynth = true;
+                                track.synthType = synthType;
+                                console.log(`Found synth track: ${track.name} with synthType: ${synthType}`);
+                                console.log(`Track properties: isSynth=${track.isSynth}, synthType=${track.synthType}, sample=${track.sample}`);
+                            } else {
+                                console.log(`Track ${trackNode[1]} is NOT a synth track`);
+                            }
+
                             // Find notes section dynamically
                             const notesNode = this.findSection(trackNode, 'notes');
                             if (!notesNode) {
@@ -184,11 +199,13 @@ const parser = {
                                     const noteActive = this.findArgument(noteNode, ':active') === 1;
                                     const notePitch = this.findArgument(noteNode, ':pitch') || 0;
                                     const noteVolume = this.findArgument(noteNode, ':volume') || 0;
+                                    const noteDuration = this.findArgument(noteNode, ':duration');
                                     
                                     track.notes.push({
                                         active: noteActive !== null ? noteActive : false,
                                         pitch: notePitch,
-                                        volume: noteVolume
+                                        volume: noteVolume,
+                                        duration: noteDuration
                                     });
                                 }
                             }

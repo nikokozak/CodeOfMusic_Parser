@@ -2,6 +2,7 @@
 const player = {
     // Core properties
     players: new Map(),         // Store for sample players
+    synths: new Map(),          // Store for Tone.js synths
     transport: Tone.Transport,  // Tone.js transport
     currentStep: 0,             // Current step in the sequence
     stepLength: '16n',          // Default step length
@@ -34,6 +35,7 @@ const player = {
         console.log('Initializing player with data:', data);
         this.stop();
         this.players.clear();
+        this.synths.clear();
         this.parts.clear();
         this.trackStates.clear();
         
@@ -88,6 +90,142 @@ const player = {
         // Finalize initialization
         await Tone.loaded();
         console.log('Player initialization complete');
+    },
+
+    // Create or get a synth instance
+    getSynth(synthType) {
+        console.log(`Getting synth of type: ${synthType}`);
+        
+        // Use cached synth if available
+        if (this.synths.has(synthType)) {
+            console.log(`Using cached synth for ${synthType}`);
+            return this.synths.get(synthType);
+        }
+        
+        // Create a new synth instance based on type
+        let synth = null;
+        try {
+            const lowerType = synthType.toLowerCase();
+            console.log(`Creating new synth of type: ${lowerType}`);
+            
+            switch (lowerType) {
+                case 'synth':
+                    synth = new Tone.Synth().toDestination();
+                    break;
+                case 'amsynth':
+                    synth = new Tone.AMSynth().toDestination();
+                    break;
+                case 'fmsynth':
+                    synth = new Tone.FMSynth().toDestination();
+                    break;
+                case 'monosynth':
+                    synth = new Tone.MonoSynth().toDestination();
+                    break;
+                case 'polysynth':
+                    synth = new Tone.PolySynth().toDestination();
+                    break;
+                case 'pluck':
+                    synth = new Tone.PluckSynth().toDestination();
+                    break;
+                case 'membrane':
+                    synth = new Tone.MembraneSynth().toDestination();
+                    break;
+                case 'metal':
+                    synth = new Tone.MetalSynth().toDestination();
+                    break;
+                case 'noise':
+                    synth = new Tone.NoiseSynth().toDestination();
+                    break;
+                default:
+                    // Default to basic Synth
+                    synth = new Tone.Synth().toDestination();
+                    console.warn(`Unknown synth type '${synthType}', defaulting to Synth`);
+            }
+            
+            console.log(`Successfully created synth of type ${lowerType}`);
+            
+            // Cache the synth instance
+            this.synths.set(synthType, synth);
+            return synth;
+        } catch (err) {
+            console.error(`Failed to create synth of type ${synthType}:`, err);
+            return null;
+        }
+    },
+
+    // Play a synth note immediately
+    playSynth(synthEvent) {
+        if (!synthEvent) return;
+        
+        try {
+            const { synthType, note, duration, velocity } = synthEvent;
+            const synth = this.getSynth(synthType);
+            
+            if (!synth) {
+                console.error(`Could not get synth of type ${synthType}`);
+                return;
+            }
+            
+            // Apply velocity to synth volume
+            synth.volume.value = (velocity - 0.7) * 20; // Map 0-1 velocity to reasonable dB range
+            
+            // Handle both single notes and chords
+            if (Array.isArray(note)) {
+                // It's a chord - check if the synth supports it
+                if (synthType.toLowerCase() === 'polysynth' || 
+                    synth.voices || // Check if it has voices property (PolySynth)
+                    typeof synth.triggerAttackRelease === 'function') {
+                    synth.triggerAttackRelease(note, duration);
+                    console.log(`Playing synth ${synthType} chord [${note.join(', ')}] for duration ${duration}`);
+                } else {
+                    // For monophonic synths, just play the first note
+                    synth.triggerAttackRelease(note[0], duration);
+                    console.log(`Playing synth ${synthType} first note of chord ${note[0]} for duration ${duration}`);
+                }
+            } else {
+                // It's a single note
+                synth.triggerAttackRelease(note, duration);
+                console.log(`Playing synth ${synthType} note ${note} for duration ${duration}`);
+            }
+        } catch (err) {
+            console.error('Error playing synth note:', err);
+        }
+    },
+
+    // Convert MIDI pitch number to note name
+    midiToNoteName(midiPitch) {
+        const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const octave = Math.floor(midiPitch / 12) - 1;
+        const noteIndex = midiPitch % 12;
+        return notes[noteIndex] + octave;
+    },
+
+    // Convert duration value to Tone.js format
+    convertDurationToToneFormat(duration) {
+        // If duration is already a string (like "8n", "4n", etc.), return it as is
+        if (typeof duration === 'string') {
+            return duration;
+        }
+        
+        // If duration is a number, interpret it as beats
+        if (typeof duration === 'number') {
+            // Convert common fractions to note values
+            if (duration === 0.25) return "16n";      // Sixteenth note
+            if (duration === 0.5) return "8n";        // Eighth note
+            if (duration === 0.75) return "8n.";      // Dotted eighth note
+            if (duration === 1) return "4n";          // Quarter note
+            if (duration === 1.5) return "4n.";       // Dotted quarter note
+            if (duration === 2) return "2n";          // Half note
+            if (duration === 3) return "2n.";         // Dotted half note
+            if (duration === 4) return "1n";          // Whole note
+            
+            // For other values, return as seconds
+            return duration + "s";
+        }
+        
+        // Default to eighth note if invalid
+        console.warn(`Invalid duration value: ${duration}, defaulting to 8n`);
+        return "8n";
     },
 
     // Create parts from drum machine data
@@ -187,8 +325,18 @@ const player = {
                         pitch: note.pitch || 0,
                         volume: note.volume || 0,
                         trackVolume: trackVolume,
-                        arrangementVolume: arrangementVolume
+                        arrangementVolume: arrangementVolume,
+                        // Add synth information if this is a synth track
+                        isSynth: track.isSynth || false,
+                        synthType: track.synthType || null,
+                        // Add duration for synth notes
+                        duration: note.duration
                     });
+                    
+                    // Debug log for synth events
+                    if (track.isSynth) {
+                        console.log(`Created synth event: ${track.synthType} at time ${time} with pitch ${note.pitch || 0}, duration: ${note.duration || 'default'}`);
+                    }
                 }
             });
 
@@ -197,33 +345,73 @@ const player = {
             // Create part for this track
             const part = new Tone.Part((time, event) => {
                 const isTrackActive = this.trackStates.get(trackId);
+                console.log(`Processing event for track ${trackId}, active: ${isTrackActive}, isSynth: ${event.isSynth}, synthType: ${event.synthType}, sample: ${event.sample}`);
+                
                 if (isTrackActive) {
-                    const player = this.players.get(event.sample);
-                    if (player) {
-                        // Apply pitch and volume adjustments if available
-                        if (event.pitch !== 0) {
-                            player.playbackRate = Math.pow(2, event.pitch / 12);
-                        } else {
-                            player.playbackRate = 1;
+                    // First check if this is a synth event
+                    if (event.isSynth === true && event.synthType) {
+                        console.log(`SYNTH EVENT DETECTED: ${event.synthType} with pitch ${event.pitch}`);
+                        // Handle synth playback
+                        console.log(`Attempting to play synth: ${event.synthType} with pitch ${event.pitch}`);
+                        console.log(`Full event details: ${JSON.stringify(event)}`);
+                        
+                        const synth = this.getSynth(event.synthType);
+                        console.log(`Got synth instance: ${synth ? 'Yes' : 'No'}`);
+                        
+                        if (synth) {
+                            // Convert pitch to note name (if pitch is a MIDI number)
+                            let note;
+                            if (typeof event.pitch === 'number') {
+                                note = this.midiToNoteName(event.pitch + 60); // Add 60 to get middle C range
+                                console.log(`Converted pitch ${event.pitch} to note ${note}`);
+                            } else {
+                                note = event.pitch || "C4"; // Default to C4 if no pitch specified
+                                console.log(`Using direct note ${note}`);
+                            }
+                            
+                            // Apply volume adjustments
+                            const noteVolume = event.volume || 0;
+                            const combinedVolume = noteVolume + (event.trackVolume / 10) + (event.arrangementVolume / 10);
+                            synth.volume.value = combinedVolume * 20;
+                            
+                            // Determine note duration - use event duration if available, otherwise default to "8n"
+                            const duration = event.duration ? 
+                                this.convertDurationToToneFormat(event.duration) : 
+                                "8n";
+                            
+                            // Trigger the synth
+                            synth.triggerAttackRelease(note, duration, time);
+                            console.log(`Triggered synth ${event.synthType} with note ${note}, duration: ${duration}`);
                         }
-                        
-                        // Apply combined volume adjustment:
-                        // 1. Note volume (-1 to 1)
-                        // 2. Track volume (-10 to 10)
-                        // 3. Arrangement volume (-10 to 10)
-                        // Convert to dB scale for Tone.js
-                        const noteVolume = event.volume || 0;
-                        const combinedVolume = noteVolume + (event.trackVolume / 10) + (event.arrangementVolume / 10);
-                        
-                        // Scale to a reasonable dB range (-40dB to +6dB)
-                        player.volume.value = combinedVolume * 20;
-                        
-                        player.start(time);
                     } else {
-                        console.warn(`Player not found for sample: ${event.sample}`);
+                        // Handle sample playback
+                        const player = this.players.get(event.sample);
+                        if (player) {
+                            // Apply pitch and volume adjustments if available
+                            if (event.pitch !== 0) {
+                                player.playbackRate = Math.pow(2, event.pitch / 12);
+                            } else {
+                                player.playbackRate = 1;
+                            }
+                            
+                            // Apply combined volume adjustment:
+                            // 1. Note volume (-1 to 1)
+                            // 2. Track volume (-10 to 10)
+                            // 3. Arrangement volume (-10 to 10)
+                            // Convert to dB scale for Tone.js
+                            const noteVolume = event.volume || 0;
+                            const combinedVolume = noteVolume + (event.trackVolume / 10) + (event.arrangementVolume / 10);
+                            
+                            // Scale to a reasonable dB range (-40dB to +6dB)
+                            player.volume.value = combinedVolume * 20;
+                            
+                            player.start(time);
+                        } else {
+                            console.warn(`Player not found for sample: ${event.sample}`);
+                        }
                     }
                 }
-            }, events);
+            }, []);
 
             part.loop = true;
             
@@ -231,6 +419,10 @@ const player = {
             // This allows each track to have its own loop length
             part.loopEnd = `${trackBars}m`;
             console.log(`Setting track ${trackId} loop length to ${trackBars}m`);
+            
+            // Add all events to the part
+            events.forEach(event => part.add(event));
+            console.log(`Added ${events.length} events to part for track ${trackId}`);
             
             this.parts.set(trackId, part);
         });
@@ -305,26 +497,70 @@ const player = {
             // Create new part for this track
             const part = new Tone.Part((time, event) => {
                 const isTrackActive = this.trackStates.get(trackId);
+                console.log(`Processing event for track ${trackId}, active: ${isTrackActive}, isSynth: ${event.isSynth}, synthType: ${event.synthType}, sample: ${event.sample}`);
+                
                 if (isTrackActive) {
-                    const player = this.players.get(event.sample);
-                    if (player) {
-                        // Apply pitch and volume adjustments if available
-                        if (event.pitch !== 0) {
-                            player.playbackRate = Math.pow(2, event.pitch / 12);
-                        } else {
-                            player.playbackRate = 1;
+                    // First check if this is a synth event
+                    if (event.isSynth === true && event.synthType) {
+                        console.log(`SYNTH EVENT DETECTED: ${event.synthType} with pitch ${event.pitch}`);
+                        // Handle synth playback
+                        console.log(`Attempting to play synth: ${event.synthType} with pitch ${event.pitch}`);
+                        console.log(`Full event details: ${JSON.stringify(event)}`);
+                        
+                        const synth = this.getSynth(event.synthType);
+                        console.log(`Got synth instance: ${synth ? 'Yes' : 'No'}`);
+                        
+                        if (synth) {
+                            // Convert pitch to note name (if pitch is a MIDI number)
+                            let note;
+                            if (typeof event.pitch === 'number') {
+                                note = this.midiToNoteName(event.pitch + 60); // Add 60 to get middle C range
+                                console.log(`Converted pitch ${event.pitch} to note ${note}`);
+                            } else {
+                                note = event.pitch || "C4"; // Default to C4 if no pitch specified
+                                console.log(`Using direct note ${note}`);
+                            }
+                            
+                            // Apply volume adjustments
+                            const noteVolume = event.volume || 0;
+                            const combinedVolume = noteVolume + (event.trackVolume / 10) + (event.arrangementVolume / 10);
+                            synth.volume.value = combinedVolume * 20;
+                            
+                            // Determine note duration - use event duration if available, otherwise default to "8n"
+                            const duration = event.duration ? 
+                                this.convertDurationToToneFormat(event.duration) : 
+                                "8n";
+                            
+                            // Trigger the synth
+                            synth.triggerAttackRelease(note, duration, time);
+                            console.log(`Triggered synth ${event.synthType} with note ${note}, duration: ${duration}`);
                         }
-                        
-                        // Apply combined volume adjustment
-                        const noteVolume = event.volume || 0;
-                        const combinedVolume = noteVolume + (event.trackVolume / 10) + (event.arrangementVolume / 10);
-                        
-                        // Scale to a reasonable dB range
-                        player.volume.value = combinedVolume * 20;
-                        
-                        player.start(time);
                     } else {
-                        console.warn(`Player not found for sample: ${event.sample}`);
+                        // Handle sample playback
+                        const player = this.players.get(event.sample);
+                        if (player) {
+                            // Apply pitch and volume adjustments if available
+                            if (event.pitch !== 0) {
+                                player.playbackRate = Math.pow(2, event.pitch / 12);
+                            } else {
+                                player.playbackRate = 1;
+                            }
+                            
+                            // Apply combined volume adjustment:
+                            // 1. Note volume (-1 to 1)
+                            // 2. Track volume (-10 to 10)
+                            // 3. Arrangement volume (-10 to 10)
+                            // Convert to dB scale for Tone.js
+                            const noteVolume = event.volume || 0;
+                            const combinedVolume = noteVolume + (event.trackVolume / 10) + (event.arrangementVolume / 10);
+                            
+                            // Scale to a reasonable dB range
+                            player.volume.value = combinedVolume * 20;
+                            
+                            player.start(time);
+                        } else {
+                            console.warn(`Player not found for sample: ${event.sample}`);
+                        }
                     }
                 }
             }, []);
@@ -333,6 +569,9 @@ const player = {
             part.loop = true;
             part.loopEnd = `${trackBars}m`;
             console.log(`Setting track ${trackId} loop length to ${trackBars}m`);
+            
+            // Create an array to store events for this track
+            const events = [];
             
             // Add events to the part
             track.notes.forEach((note, index) => {
@@ -359,16 +598,34 @@ const player = {
                     
                     const time = `${measure}:${beat}:${sixteenth}`;
                     
-                    part.add({
+                    // Create the event object
+                    const event = {
                         time,
                         sample: track.sample,
                         pitch: note.pitch || 0,
                         volume: note.volume || 0,
                         trackVolume: trackVolume,
-                        arrangementVolume: arrangementVolume
-                    });
+                        arrangementVolume: arrangementVolume,
+                        // Add synth information if this is a synth track
+                        isSynth: track.isSynth || false,
+                        synthType: track.synthType || null,
+                        // Add duration for synth notes
+                        duration: note.duration
+                    };
+                    
+                    // Add the event to our array
+                    events.push(event);
+                    
+                    // Debug log for synth events in update method
+                    if (track.isSynth) {
+                        console.log(`Update: Created synth event: ${track.synthType} at time ${time} with pitch ${note.pitch || 0}, duration: ${note.duration || 'default'}`);
+                    }
                 }
             });
+            
+            // Add all events to the part
+            events.forEach(event => part.add(event));
+            console.log(`Added ${events.length} events to part for track ${trackId}`);
             
             // Store and start the part
             this.parts.set(trackId, part);

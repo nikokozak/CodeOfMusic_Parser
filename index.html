@@ -193,6 +193,32 @@
             color: #888;
             margin-left: 20px;
         }
+        .help-section {
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 1px solid #555;
+        }
+        .sample-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 5px;
+            margin-top: 5px;
+        }
+        .sample-item {
+            background: #444;
+            padding: 3px 5px;
+            border-radius: 3px;
+            text-align: center;
+        }
+        .code-example {
+            background: #222;
+            padding: 3px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 11px;
+            display: inline-block;
+            margin-top: 3px;
+        }
     </style>
 </head>
 <body>
@@ -241,6 +267,52 @@
             <li>Or place cursor on a line with a macro and press <strong>Ctrl+Space</strong></li>
             <li>Or use the <strong>Debug Macros</strong> button to find and expand macros</li>
         </ul>
+        
+        <div class="help-section">
+            <h3>Available Samples</h3>
+            <div class="sample-grid">
+                <div class="sample-item">kick</div>
+                <div class="sample-item">snare</div>
+                <div class="sample-item">hihat</div>
+                <div class="sample-item">clap</div>
+                <div class="sample-item">tom</div>
+                <div class="sample-item">rim</div>
+                <div class="sample-item">cowbell</div>
+                <div class="sample-item">crash</div>
+                <div class="sample-item">ride</div>
+            </div>
+            <div class="code-example">(track "kick" kick :active 1 :volume 0)</div>
+        </div>
+        
+        <div class="help-section">
+            <h3>Track Parameters</h3>
+            <ul>
+                <li><strong>:active</strong> - 1 (on) or 0 (off)</li>
+                <li><strong>:volume</strong> - Range from -10 to 10</li>
+                <li><strong>:time</strong> - Steps per measure (default: 16)</li>
+                <li><strong>:bars</strong> - Length in measures (default: 1)</li>
+            </ul>
+        </div>
+        
+        <div class="help-section">
+            <h3>Note Parameters</h3>
+            <ul>
+                <li><strong>:active</strong> - 1 (play) or 0 (silent)</li>
+                <li><strong>:pitch</strong> - Pitch adjustment in semitones</li>
+                <li><strong>:volume</strong> - Volume adjustment from -1 to 1</li>
+            </ul>
+        </div>
+        
+        <div class="help-section">
+            <h3>Effects</h3>
+            <p>Available effects:</p>
+            <ul>
+                <li><strong>Chorus</strong> - <span class="code-example">(effect 'Chorus frequency delayTime depth step)</span></li>
+                <li><strong>Reverb</strong> - <span class="code-example">(effect 'Reverb decayTime step)</span></li>
+                <li><strong>Delay</strong> - <span class="code-example">(effect 'Delay delayTime feedback step)</span></li>
+                <li><strong>Distortion</strong> - <span class="code-example">(effect 'Distortion amount step)</span></li>
+            </ul>
+        </div>
     </div>
     <div class="debug-panel" id="debug-panel"></div>
 </body>

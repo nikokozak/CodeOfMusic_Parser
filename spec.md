@@ -278,66 +278,6 @@ In this example:
       (step 1))))
 ```
 
-### Complex Drum Machine Example
-```lisp
-(drum-machine :tempo 120 :signature 4 '[
-  (arrangement :active 1 :bars 2 '[
-    (track "kick" '[ ;; Kick drum track, plays the "kick" sample every step
-      (step 0)
-      (effect 'Chorus 4 2.5 0.5 ;; Chorus effect with corresponding parameters
-        (step 1))
-      (step 0)
-      (step 1 :pitch 0 :volume 1) ;; Triggers "kick" sound with neutral pitch and +1 volume
-    ])
-    (track "snare" '[ ;; Tracks are constructed as ToneJS Parts with multiple steps
-      (step 1)
-      (step 0)
-      (step 1)
-      (step 0)
-      (step 1)
-    ])
-    (track "hihat" '[
-      (step 0)
-      (step 1)
-      (step 0)
-      (step 1)
-    ])
-  ])
-  (arrangement :active 0 :bars 4 '[
-    (track "synth" '[
-      (step 0 :pitch 60 :duration 0.5)
-      (step 1 :pitch 62 :duration 0.5)
-      (step 0 :pitch 64 :duration 0.5)
-      (step 1 :pitch 65 :duration 0.5)
-    ])
-    (track "kick" '[
-      (step 0 :pitch -3 :volume 0.5)
-      (step 1 :pitch -1 :volume -0.5)
-      (step 0 pitch 1 :volume 0.5)
-      (step 1)
-    ])
-  )
-])
-```
-
-### Basic Melodic Example
-```lisp
-; Define a simple melody
-(let '(
-  [tempo 120]
-  [beat (/ 60 tempo)]
-)
-  (sequence
-    (note "C4" beat)
-    (note "E4" beat)
-    (note "G4" beat)
-    (chord '["C4" "E4" "G4"] (* beat 2)))
-)
-
-; Create a beat pattern
-(beat-machine "x...x...x.x." '["C2"] :tempo 120 :swing 0.2)
-```
-
 ## Implementation Update
 
 The project has been streamlined by incorporating elements from the BeatParser example to create a more focused and functional implementation. The following changes were made:
@@ -475,3 +415,121 @@ const macros = {
 Macros can be either:
 1. Static strings that are inserted directly
 2. Functions that generate dynamic content based on the trigger text
+
+## Synth Support
+
+The parser now supports Tone.js synthesizers via the `synth` function:
+
+```lisp
+(synth 'Synth-Type "Note" "Duration")
+```
+
+Where:
+- **Synth-Type** is the type of synthesizer (e.g., 'synth', 'amsynth', 'fmsynth')
+- **Note** is the note to play in standard notation (e.g., "C4", "Eb3")
+- **Duration** is the note duration (e.g., "8n", "4n", "1n", "1m")
+
+Available synthesizer types:
+- **synth** - Basic Tone.js Synth
+- **amsynth** - AM Synthesizer
+- **fmsynth** - FM Synthesizer
+- **monosynth** - Monophonic Synthesizer
+- **polysynth** - Polyphonic Synthesizer
+- **pluck** - Plucked string sound
+- **membrane** - Drum membrane sound
+- **metal** - Metallic sound
+- **noise** - Noise generator
+
+Example usage:
+```lisp
+;; Play a C4 note with a basic synth for an eighth note
+(synth 'synth "C4" "8n")
+
+;; Play an E4 note with FM synthesis for a quarter note
+(synth 'fmsynth "E4" "4n")
+
+;; Play a chord with a polysynth
+(synth 'polysynth ["C4", "E4", "G4"] "4n")
+```
+
+Named arguments can also be used:
+```lisp
+;; Play a note with specific velocity
+(synth 'synth "C4" "8n" :velocity 0.8)
+```
+
+## Using Synths in Tracks
+
+In addition to using samples, tracks can now use Tone.js synthesizers. To use a synth in a track, add the `:synth` parameter with the synth type:
+
+```lisp
+(track "melody" kick :active 1 :synth "fmsynth"
+  (notes
+    (note :active 1 :pitch 0)  ;; C4 (MIDI note 60)
+    (note :active 0)
+    (note :active 1 :pitch 4 :duration 1)  ;; E4 (MIDI note 64) - quarter note
+    (note :active 0)
+  )
+)
+```
+
+The `:pitch` parameter in notes works differently for synth tracks:
+- It represents a MIDI note number offset from middle C (60)
+- For example, `:pitch 0` plays C4, `:pitch 7` plays G4, `:pitch -12` plays C3
+
+You can also specify the duration of synth notes using the `:duration` parameter:
+- Can be a number (in beats) or a string in Tone.js format
+- Examples: `:duration 0.5` (eighth note), `:duration 1` (quarter note), `:duration "8n."` (dotted eighth)
+- If omitted, defaults to an eighth note ("8n")
+
+Available synth types:
+- **synth** - Basic Tone.js Synth
+- **amsynth** - AM Synthesizer
+- **fmsynth** - FM Synthesizer
+- **monosynth** - Monophonic Synthesizer
+- **polysynth** - Polyphonic Synthesizer
+- **pluck** - Plucked string sound
+- **membrane** - Drum membrane sound
+- **metal** - Metallic sound
+- **noise** - Noise generator
+
+Example with multiple synth tracks:
+```lisp
+(arrangement :active 1 :bars 2
+  ;; Bass track using monosynth
+  (track "bass" kick :active 1 :synth "monosynth" :volume 2
+    (notes
+      (note :active 1 :pitch -12)  ;; C3
+      (note :active 0)
+      (note :active 1 :pitch -12)  ;; C3
+      (note :active 0)
+    )
+  )
+  
+  ;; Melody track using fmsynth
+  (track "melody" kick :active 1 :synth "fmsynth" :volume 0
+    (notes
+      (note :active 1 :pitch 0)   ;; C4
+      (note :active 0)
+      (note :active 1 :pitch 4 :duration 1)   ;; E4 (MIDI note 64) - quarter note
+      (note :active 0)
+      (note :active 1 :pitch 7 :duration 0.5)   ;; G4 - eighth note
+      (note :active 0)
+      (note :active 1 :pitch 12 :duration 2)  ;; C5 - half note
+      (note :active 0)
+    )
+  )
+  
+  ;; Percussion track using samples
+  (track "hihat" hihat :active 1
+    (notes
+      (note :active 1)
+      (note :active 1)
+      (note :active 1)
+      (note :active 1)
+    )
+  )
+)
+```
+
+Note that the sample parameter (e.g., `kick` in the examples above) is still required by the parser but is ignored for synth tracks.
