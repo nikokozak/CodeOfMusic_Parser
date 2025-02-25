@@ -124,20 +124,35 @@ const player = {
         const arrangementBars = activeArrangement.bars || 1;
         this.transport.setLoopPoints(0, `${arrangementBars}m`);
         console.log(`Setting arrangement loop length to ${arrangementBars} bars`);
+        
+        // Get arrangement volume (default to 0 if not specified)
+        const arrangementVolume = activeArrangement.volume || 0;
+        console.log(`Arrangement volume: ${arrangementVolume}`);
 
         // Create parts for each track
-        activeArrangement.tracks.forEach(track => {
-            console.log(`Processing track ${track.name}, active: ${track.active}, time: ${track.time}`);
+        activeArrangement.tracks.forEach((track, trackIndex) => {
+            // Generate a unique track ID using both name and index
+            const trackId = `${track.name}_${trackIndex}`;
+            console.log(`Processing track ${trackId}, active: ${track.active}, time: ${track.time}`);
             
-            // Store track state
-            this.trackStates.set(track.name, track.active);
+            // Store track state with unique ID
+            this.trackStates.set(trackId, track.active);
             
             const events = [];
+            
+            // Get track bars - this is the track's individual loop length
+            // Only default to arrangement bars if not specified
+            const trackBars = track.bars !== undefined ? track.bars : arrangementBars;
+            console.log(`Track ${trackId} bars: ${trackBars}`);
             
             // Calculate how many notes we can fit in the track based on bars and time signature
             // time parameter represents subdivisions per measure
             const notesPerMeasure = track.time || 16;
-            const totalNotes = notesPerMeasure * (track.bars || arrangementBars);
+            const totalNotes = notesPerMeasure * trackBars;
+            
+            // Get track volume (default to 0 if not specified)
+            const trackVolume = track.volume || 0;
+            console.log(`Track ${trackId} volume: ${trackVolume}`);
             
             // Convert notes to timed events
             track.notes.forEach((note, index) => {
@@ -170,16 +185,18 @@ const player = {
                         time,
                         sample: track.sample,
                         pitch: note.pitch || 0,
-                        volume: note.volume || 0
+                        volume: note.volume || 0,
+                        trackVolume: trackVolume,
+                        arrangementVolume: arrangementVolume
                     });
                 }
             });
 
-            console.log(`Created ${events.length} events for track ${track.name}`);
+            console.log(`Created ${events.length} events for track ${trackId}`);
 
             // Create part for this track
             const part = new Tone.Part((time, event) => {
-                const isTrackActive = this.trackStates.get(track.name);
+                const isTrackActive = this.trackStates.get(trackId);
                 if (isTrackActive) {
                     const player = this.players.get(event.sample);
                     if (player) {
@@ -190,9 +207,16 @@ const player = {
                             player.playbackRate = 1;
                         }
                         
-                        // Apply volume adjustment
-                        const volumeAdjust = event.volume || 0;
-                        player.volume.value = volumeAdjust * 20; // Convert to dB scale
+                        // Apply combined volume adjustment:
+                        // 1. Note volume (-1 to 1)
+                        // 2. Track volume (-10 to 10)
+                        // 3. Arrangement volume (-10 to 10)
+                        // Convert to dB scale for Tone.js
+                        const noteVolume = event.volume || 0;
+                        const combinedVolume = noteVolume + (event.trackVolume / 10) + (event.arrangementVolume / 10);
+                        
+                        // Scale to a reasonable dB range (-40dB to +6dB)
+                        player.volume.value = combinedVolume * 20;
                         
                         player.start(time);
                     } else {
@@ -203,12 +227,12 @@ const player = {
 
             part.loop = true;
             
-            // Set the loop end based on the arrangement's bars
-            // This ensures all tracks loop together with the arrangement
-            part.loopEnd = `${arrangementBars}m`;
-            console.log(`Setting track ${track.name} loop length to ${arrangementBars}m`);
+            // Set the loop end based on the track's bars
+            // This allows each track to have its own loop length
+            part.loopEnd = `${trackBars}m`;
+            console.log(`Setting track ${trackId} loop length to ${trackBars}m`);
             
-            this.parts.set(track.name, part);
+            this.parts.set(trackId, part);
         });
     },
 
@@ -248,66 +272,107 @@ const player = {
         
         // If same arrangement, just update tracks
         console.log('Updating parts with new data');
-        activeArrangement.tracks.forEach(track => {
-            console.log(`Updating track ${track.name}, active: ${track.active}`);
+        
+        // Get arrangement volume
+        const arrangementVolume = activeArrangement.volume || 0;
+        
+        // Clear existing parts to avoid stale tracks
+        this.parts.forEach(part => part.dispose());
+        this.parts.clear();
+        this.trackStates.clear();
+        
+        // Recreate all tracks with unique IDs
+        activeArrangement.tracks.forEach((track, trackIndex) => {
+            // Generate a unique track ID using both name and index
+            const trackId = `${track.name}_${trackIndex}`;
+            console.log(`Updating track ${trackId}, active: ${track.active}`);
             
-            // Update track state
-            this.trackStates.set(track.name, track.active);
+            // Update track state with unique ID
+            this.trackStates.set(trackId, track.active);
             
-            // Get or create part for this track
-            let part = this.parts.get(track.name);
-            if (!part) {
-                console.log(`Part for track ${track.name} not found, recreating all parts`);
-                this.createParts(data);
-                part = this.parts.get(track.name);
-                return;
-            }
-
-            if (part) {
-                // Update loop end to match arrangement bars
-                part.loopEnd = `${arrangementBars}m`;
-                
-                // Update events
-                part.clear();
-                
-                // Calculate how many notes we can fit in the track based on bars and time signature
-                const timeSignature = data.signature || 4;
-                const notesPerMeasure = track.time || 16;
-                const totalNotes = notesPerMeasure * (track.bars || arrangementBars);
-                
-                track.notes.forEach((note, index) => {
-                    // Skip notes that exceed the track's length
-                    if (index >= totalNotes) {
-                        return;
+            // Get track bars - this is the track's individual loop length
+            // Only default to arrangement bars if not specified
+            const trackBars = track.bars !== undefined ? track.bars : arrangementBars;
+            
+            // Calculate how many notes we can fit in the track based on bars and time signature
+            const timeSignature = data.signature || 4;
+            const notesPerMeasure = track.time || 16;
+            const totalNotes = notesPerMeasure * trackBars;
+            
+            // Get track volume
+            const trackVolume = track.volume || 0;
+            
+            // Create new part for this track
+            const part = new Tone.Part((time, event) => {
+                const isTrackActive = this.trackStates.get(trackId);
+                if (isTrackActive) {
+                    const player = this.players.get(event.sample);
+                    if (player) {
+                        // Apply pitch and volume adjustments if available
+                        if (event.pitch !== 0) {
+                            player.playbackRate = Math.pow(2, event.pitch / 12);
+                        } else {
+                            player.playbackRate = 1;
+                        }
+                        
+                        // Apply combined volume adjustment
+                        const noteVolume = event.volume || 0;
+                        const combinedVolume = noteVolume + (event.trackVolume / 10) + (event.arrangementVolume / 10);
+                        
+                        // Scale to a reasonable dB range
+                        player.volume.value = combinedVolume * 20;
+                        
+                        player.start(time);
+                    } else {
+                        console.warn(`Player not found for sample: ${event.sample}`);
                     }
+                }
+            }, []);
+            
+            // Set loop properties
+            part.loop = true;
+            part.loopEnd = `${trackBars}m`;
+            console.log(`Setting track ${trackId} loop length to ${trackBars}m`);
+            
+            // Add events to the part
+            track.notes.forEach((note, index) => {
+                // Skip notes that exceed the track's length
+                if (index >= totalNotes) {
+                    return;
+                }
+                
+                if (note.active) {
+                    // Calculate time based on the time signature and track's time parameter
+                    const beatsPerMeasure = timeSignature;
+                    const subdivision = beatsPerMeasure / notesPerMeasure;
                     
-                    if (note.active) {
-                        // Calculate time based on the time signature and track's time parameter
-                        const beatsPerMeasure = timeSignature;
-                        const subdivision = beatsPerMeasure / notesPerMeasure;
-                        
-                        // Calculate which measure this note belongs to
-                        const measure = Math.floor(index / notesPerMeasure);
-                        
-                        // Calculate position within the measure
-                        const positionInMeasure = index % notesPerMeasure;
-                        
-                        // Calculate beat and sixteenth
-                        const beat = Math.floor(positionInMeasure * subdivision);
-                        const remainder = (positionInMeasure * subdivision) % 1;
-                        const sixteenth = Math.floor(remainder * 4);
-                        
-                        const time = `${measure}:${beat}:${sixteenth}`;
-                        
-                        part.add({
-                            time,
-                            sample: track.sample,
-                            pitch: note.pitch || 0,
-                            volume: note.volume || 0
-                        });
-                    }
-                });
-            }
+                    // Calculate which measure this note belongs to
+                    const measure = Math.floor(index / notesPerMeasure);
+                    
+                    // Calculate position within the measure
+                    const positionInMeasure = index % notesPerMeasure;
+                    
+                    // Calculate beat and sixteenth
+                    const beat = Math.floor(positionInMeasure * subdivision);
+                    const remainder = (positionInMeasure * subdivision) % 1;
+                    const sixteenth = Math.floor(remainder * 4);
+                    
+                    const time = `${measure}:${beat}:${sixteenth}`;
+                    
+                    part.add({
+                        time,
+                        sample: track.sample,
+                        pitch: note.pitch || 0,
+                        volume: note.volume || 0,
+                        trackVolume: trackVolume,
+                        arrangementVolume: arrangementVolume
+                    });
+                }
+            });
+            
+            // Store and start the part
+            this.parts.set(trackId, part);
+            part.start(0);
         });
     },
 
@@ -362,7 +427,11 @@ const player = {
     setTempo(bpm) {
         if (typeof bpm === 'number' && bpm > 0) {
             this.transport.bpm.value = bpm;
-            console.log(`Tempo set to ${bpm} BPM`);
         }
     }
-}; 
+};
+
+// Export the player for use in other modules
+if (typeof module !== 'undefined') {
+    module.exports = player;
+} 

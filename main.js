@@ -39,38 +39,36 @@ function initializeEditor() {
     });
 
     // Set initial editor content
-    jar.updateCode(`(drum-machine "basic-beat" :tempo 110 :signature 4
-  (arrangement :active 1 :bars 2
-    (track "kick" kick :active 1
+    jar.updateCode(`(drum-machine "polyrhythm-beat" :tempo 110 :signature 4
+  (arrangement :active 1 :bars 4 :volume 0
+    (track "kick" kick :active 1 :volume 2 :bars 1
       (notes
-        (note :active 1)
-        (note :active 0)
-        (note :active 1)
-        (note :active 0)
         (note :active 1)
         (note :active 0)
         (note :active 1)
         (note :active 0)
       )
     )
-    (track "hihat" hihat :active 1 :time 8
+    (track "hihat" hihat :active 1 :time 8 :volume -3 :bars 2
       (notes
         (note :active 1)
         (note :active 1)
         (note :active 1)
         (note :active 1)
+        (note :active 0)
+        (note :active 0)
+        (note :active 0)
+        (note :active 0)
       )
     )
-    (track "snare" snare :active 1
+    (track "snare" snare :active 1 :volume 0 :bars 3
       (notes
         (note :active 0)
-        (note :active 1)
+        (note :active 1 :volume 0.5)
         (note :active 0)
-        (note :active 1)
+        (note :active 1 :volume -0.5)
         (note :active 0)
-        (note :active 1)
-        (note :active 0)
-        (note :active 1)
+        (note :active 1 :volume 0.8)
       )
     )
   )

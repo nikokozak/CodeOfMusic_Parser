@@ -118,6 +118,7 @@ The drum machine implementation provides a powerful way to create rhythmic patte
    - Parameters:
      - `:active` (default: true) - Whether the arrangement should play (1 = active, 0 = inactive)
      - `:bars` (default: 1) - Length of the arrangement in bars/measures
+     - `:volume` (default: 0) - Volume adjustment from -10 to 10
 
 3. **track**
    - A sequence of steps for a specific instrument sound
@@ -130,7 +131,7 @@ The drum machine implementation provides a powerful way to create rhythmic patte
    - Parameters:
      - First argument: Active state (1 = play sound, 0 = silent)
      - `:pitch` (default: 0) - Pitch adjustment in semitones
-     - `:volume` (default: 0) - Volume adjustment (-1 to 1)
+     - `:volume` (default: 0) - Volume adjustment from -10 to 10
      - `:duration` (default: 0.25) - Duration of the sound in seconds
 
 5. **effect**
@@ -189,8 +190,10 @@ To ensure consistent behavior in the drum machine, the following guidelines shou
 
 ### Bars
 - The `:bars` parameter can be specified at both the `arrangement` and `track` levels
-- At the `arrangement` level, it sets the overall loop length for all tracks
-- At the `track` level, it can override the arrangement's bar count for specific tracks
+- At the `arrangement` level, it sets the overall loop length for the transport
+- At the `track` level, it sets the individual loop length for that specific track
+- If a track's `:bars` parameter is not specified, it defaults to the arrangement's bars
+- This allows for polyrhythmic patterns where tracks can have different loop lengths
 - If a track has more notes than can fit in its bars, excess notes will be ignored
 - Default: 1 bar
 
@@ -203,14 +206,22 @@ To ensure consistent behavior in the drum machine, the following guidelines shou
 ### Note Parameters
 - `:active` - Whether the note triggers a sound (1) or is silent (0)
 - `:pitch` - Pitch adjustment in semitones (affects playback rate)
-- `:volume` - Volume adjustment from -1 (quieter) to 1 (louder)
+- `:volume` - Volume adjustment from -10 to 10
+
+### Volume Control
+- The `:volume` parameter can be specified at multiple levels:
+  - **Arrangement level**: Sets the base volume for all tracks in the arrangement (range: -10 to 10)
+  - **Track level**: Sets the volume for a specific track (range: -10 to 10)
+  - **Note level**: Fine-tune volume for individual notes (range: -1 to 1)
+- Volumes are additive across levels (arrangement + track + note)
+- Default: 0 (neutral volume)
 
 ## Example with Parameters
 
 ```lisp
 (drum-machine "example" :tempo 110 :signature 3
-  (arrangement :active 1 :bars 2
-    (track "kick" kick :active 1 :time 6
+  (arrangement :active 1 :bars 2 :volume 2
+    (track "kick" kick :active 1 :time 6 :volume 0
       (notes
         (note :active 1)
         (note :active 0)
@@ -220,19 +231,19 @@ To ensure consistent behavior in the drum machine, the following guidelines shou
         (note :active 0)
       )
     )
-    (track "hihat" hihat :active 1 :time 12
+    (track "hihat" hihat :active 1 :time 12 :volume -4
       (notes
+        (note :active 1 :volume 0.5)
         (note :active 1)
+        (note :active 1 :volume 0.5)
         (note :active 1)
+        (note :active 1 :volume 0.5)
         (note :active 1)
+        (note :active 1 :volume 0.5)
         (note :active 1)
+        (note :active 1 :volume 0.5)
         (note :active 1)
-        (note :active 1)
-        (note :active 1)
-        (note :active 1)
-        (note :active 1)
-        (note :active 1)
-        (note :active 1)
+        (note :active 1 :volume 0.5)
         (note :active 1)
       )
     )
@@ -243,9 +254,10 @@ To ensure consistent behavior in the drum machine, the following guidelines shou
 In this example:
 - The tempo is 110 BPM
 - The time signature is 3/4 (3 beats per measure)
-- The arrangement is 2 bars long
-- The kick track has 6 steps per measure (2 steps per beat)
-- The hihat track has 12 steps per measure (4 steps per beat)
+- The arrangement is 2 bars long with a volume boost of +2
+- The kick track has 6 steps per measure (2 steps per beat) with neutral volume
+- The hihat track has 12 steps per measure (4 steps per beat) with reduced volume (-4)
+- Every other hihat note has a slight volume boost (+0.5)
 
 ## Usage Examples
 

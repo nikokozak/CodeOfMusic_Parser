@@ -143,11 +143,13 @@ const parser = {
                 if (Array.isArray(node) && node[0] === 'arrangement') {
                     const isActive = this.findArgument(node, ':active') === 1;
                     const bars = this.findArgument(node, ':bars') || 1;
+                    const volume = this.findArgument(node, ':volume') || 0;
 
                     const arrangement = {
                         id: `arr_${i}`,
                         active: isActive,
                         bars: bars,
+                        volume: volume,
                         tracks: []
                     };
 
@@ -158,6 +160,7 @@ const parser = {
                             const trackActive = this.findArgument(trackNode, ':active') === 1;
                             const trackBars = this.findArgument(trackNode, ':bars') || arrangement.bars;
                             const time = this.findArgument(trackNode, ':time') || 16;
+                            const trackVolume = this.findArgument(trackNode, ':volume') || 0;
 
                             const track = {
                                 name: trackNode[1],
@@ -165,7 +168,8 @@ const parser = {
                                 active: trackActive !== null ? trackActive : true,
                                 notes: [],
                                 bars: trackBars,
-                                time: time
+                                time: time,
+                                volume: trackVolume
                             };
 
                             // Find notes section dynamically
