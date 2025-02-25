@@ -21,33 +21,55 @@
     <style>
         body {
             margin: 0;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
+            padding: 0;
             background: #1e1e1e;
             font-family: monospace;
-            gap: 20px;
-            padding: 20px;
-            box-sizing: border-box;
+            color: #fff;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            width: 100vw;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            background: #2d2d2d;
+            border-bottom: 1px solid #444;
+            height: 50px;
+        }
+        .title {
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+        }
+        .editor-container {
+            flex: 1;
+            display: flex;
+            position: relative;
+            overflow: hidden;
         }
         .wrapper {
-            position: relative;
+            flex: 1;
             background: #2d2d2d;
-            border-radius: 6px;
-            padding: 16px;
-            width: 80vw;
-            height: 70vh;
             display: flex;
             flex-direction: row;
+            overflow: auto;
         }
         .editor {
             background: transparent;
             color: #fff;
-            padding: 0 16px;
+            padding: 16px;
             flex: 1;
-            height: 100%;
             overflow: auto;
             position: relative;
             outline: none;
@@ -58,23 +80,20 @@
         }
         .line-numbers {
             color: #666;
-            padding-right: 16px;
+            padding: 16px 16px 16px 0;
             white-space: pre;
             text-align: right;
             user-select: none;
             font-size: 14px;
             line-height: 1.5;
             min-width: 40px;
-        }
-        .controls {
-            display: flex;
-            gap: 10px;
+            background: #2d2d2d;
         }
         #run, #test-audio, #debug-macro {
             background: #4a4a4a;
             color: #fff;
             border: none;
-            padding: 10px 20px;
+            padding: 8px 15px;
             border-radius: 4px;
             cursor: pointer;
             font-family: monospace;
@@ -119,7 +138,7 @@
         }
         .macro-help {
             position: fixed;
-            top: 20px;
+            top: 60px;
             right: 20px;
             background-color: #333;
             color: white;
@@ -129,6 +148,7 @@
             max-width: 300px;
             z-index: 1000;
             display: none;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
         }
         .macro-help h3 {
             margin-top: 0;
@@ -142,9 +162,6 @@
             margin-bottom: 5px;
         }
         .help-button {
-            position: fixed;
-            top: 20px;
-            right: 20px;
             background-color: #4a4a4a;
             color: white;
             border: none;
@@ -153,7 +170,7 @@
             border-radius: 50%;
             cursor: pointer;
             font-weight: bold;
-            z-index: 1001;
+            margin-left: 10px;
         }
         .debug-panel {
             position: fixed;
@@ -169,20 +186,40 @@
             overflow: auto;
             z-index: 1000;
             display: none;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        .shortcuts {
+            font-size: 12px;
+            color: #888;
+            margin-left: 20px;
         }
     </style>
 </head>
 <body>
-    <div class="wrapper">
-        <div class="line-numbers"></div>
-        <div class="editor" id="editor" contenteditable spellcheck="false"></div>
+    <div class="app-container">
+        <div class="header">
+            <div class="title">Code of Music Parser</div>
+            <div style="display: flex; align-items: center;">
+                <div class="shortcuts">
+                    <span>Tab: Expand Macro</span> | 
+                    <span>Ctrl+Space: Expand at Cursor</span> | 
+                    <span>Ctrl+Enter: Run</span>
+                </div>
+                <div class="controls">
+                    <button id="test-audio">Test Audio</button>
+                    <button id="run">Run</button>
+                    <button id="debug-macro">Debug Macros</button>
+                    <button class="help-button" id="help-button">?</button>
+                </div>
+            </div>
+        </div>
+        <div class="editor-container">
+            <div class="wrapper">
+                <div class="line-numbers"></div>
+                <div class="editor" id="editor" contenteditable spellcheck="false"></div>
+            </div>
+        </div>
     </div>
-    <div class="controls">
-        <button id="test-audio">Test Audio</button>
-        <button id="run">Run (Ctrl+Enter)</button>
-        <button id="debug-macro">Debug Macros</button>
-    </div>
-    <button class="help-button" id="help-button">?</button>
     <div class="macro-help" id="macro-help">
         <h3>Macro Shortcuts</h3>
         <ul>
