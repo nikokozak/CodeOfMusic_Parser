@@ -373,4 +373,105 @@ The implementation now focuses specifically on the drum machine functionality:
 - Arrangement changes are handled smoothly
 - Real-time editing during playback is supported
 
-This update provides a more focused and functional implementation that prioritizes a working drum machine over a more complex but less functional system. 
+This update provides a more focused and functional implementation that prioritizes a working drum machine over a more complex but less functional system.
+
+## Macro System
+
+The Code of Music Parser includes a macro expansion system to speed up common coding patterns. Macros are shorthand text patterns that expand into larger code snippets when triggered.
+
+### Using Macros
+
+1. Type a macro pattern (e.g., `*-notes-4`) on a new line in the editor
+2. Press the Tab key to expand the macro into the full code snippet
+3. A help panel is available by clicking the "?" button in the top-right corner
+
+### Available Macros
+
+#### Note Patterns
+
+- `*-notes-N`: Expands to N inactive notes
+  ```lisp
+  (note :active 0)
+  (note :active 0)
+  ...
+  ```
+
+- `*-active-N`: Expands to N active notes
+  ```lisp
+  (note :active 1)
+  (note :active 1)
+  ...
+  ```
+
+- `*-alt-N`: Expands to N alternating active/inactive notes
+  ```lisp
+  (note :active 1)
+  (note :active 0)
+  (note :active 1)
+  ...
+  ```
+
+#### Rhythm Patterns
+
+- `*-four-on-floor`: Basic kick drum pattern (one kick on the downbeat)
+  ```lisp
+  (note :active 1)
+  (note :active 0)
+  (note :active 0)
+  (note :active 0)
+  ```
+
+- `*-basic-beat`: Standard kick and snare pattern
+  ```lisp
+  (note :active 1)
+  (note :active 0)
+  (note :active 0)
+  (note :active 0)
+  (note :active 0)
+  (note :active 1)
+  (note :active 0)
+  (note :active 0)
+  ```
+
+- `*-hihat-8`: Eight active hihat notes
+  ```lisp
+  (note :active 1)
+  (note :active 1)
+  ...
+  ```
+
+#### Track Templates
+
+- `*-kick-track`: Complete kick drum track
+- `*-hihat-track`: Complete hihat track
+- `*-snare-track`: Complete snare track
+
+#### Full Templates
+
+- `*-basic-arrangement`: Complete arrangement with kick, hihat, and snare tracks
+
+#### Polyrhythm Helpers
+
+- `*-poly-X-Y`: Generates two rhythms for X against Y polyrhythm
+  For example, `*-poly-3-4` generates patterns for 3 against 4 polyrhythm
+
+### Extending the Macro System
+
+The macro system is defined in `macros.js` and can be easily extended with new patterns. Each macro is defined as a key-value pair in the `macros` object:
+
+```javascript
+const macros = {
+    "*-my-macro": "(note :active 1)\n(note :active 0)",
+    
+    "*-dynamic-": (trigger) => {
+        // Extract parameters from the trigger text
+        const param = trigger.split('-').pop();
+        // Generate and return the expanded code
+        return `// Generated with parameter: ${param}`;
+    }
+};
+```
+
+Macros can be either:
+1. Static strings that are inserted directly
+2. Functions that generate dynamic content based on the trigger text

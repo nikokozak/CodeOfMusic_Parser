@@ -14,6 +14,7 @@
     <script src="linenumbers.js"></script>
     
     <!-- Our application code - order matters! -->
+    <script src="macros.js"></script>
     <script src="parser.js"></script>
     <script src="player.js"></script>
     <script src="main.js"></script>
@@ -69,7 +70,7 @@
             display: flex;
             gap: 10px;
         }
-        #run, #test-audio {
+        #run, #test-audio, #debug-macro {
             background: #4a4a4a;
             color: #fff;
             border: none;
@@ -79,7 +80,7 @@
             font-family: monospace;
             font-size: 14px;
         }
-        #run:hover, #test-audio:hover {
+        #run:hover, #test-audio:hover, #debug-macro:hover {
             background: #5a5a5a;
         }
         #test-audio {
@@ -87,6 +88,12 @@
         }
         #test-audio:hover {
             background: #3a7b3a;
+        }
+        #debug-macro {
+            background: #6b2a2a;
+        }
+        #debug-macro:hover {
+            background: #7b3a3a;
         }
         .error-message {
             position: fixed;
@@ -110,6 +117,59 @@
             border-radius: 4px;
             z-index: 1000;
         }
+        .macro-help {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: #333;
+            color: white;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            max-width: 300px;
+            z-index: 1000;
+            display: none;
+        }
+        .macro-help h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+        }
+        .macro-help ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        .macro-help li {
+            margin-bottom: 5px;
+        }
+        .help-button {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: #4a4a4a;
+            color: white;
+            border: none;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-weight: bold;
+            z-index: 1001;
+        }
+        .debug-panel {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background-color: #333;
+            color: white;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            max-width: 400px;
+            max-height: 300px;
+            overflow: auto;
+            z-index: 1000;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -120,6 +180,31 @@
     <div class="controls">
         <button id="test-audio">Test Audio</button>
         <button id="run">Run (Ctrl+Enter)</button>
+        <button id="debug-macro">Debug Macros</button>
     </div>
+    <button class="help-button" id="help-button">?</button>
+    <div class="macro-help" id="macro-help">
+        <h3>Macro Shortcuts</h3>
+        <ul>
+            <li><strong>*-notes-N</strong>: N inactive notes</li>
+            <li><strong>*-active-N</strong>: N active notes</li>
+            <li><strong>*-alt-N</strong>: N alternating notes</li>
+            <li><strong>*-four-on-floor</strong>: Basic kick pattern</li>
+            <li><strong>*-basic-beat</strong>: Kick + snare pattern</li>
+            <li><strong>*-hihat-8</strong>: 8 active hihat notes</li>
+            <li><strong>*-kick-track</strong>: Complete kick track</li>
+            <li><strong>*-hihat-track</strong>: Complete hihat track</li>
+            <li><strong>*-snare-track</strong>: Complete snare track</li>
+            <li><strong>*-basic-arrangement</strong>: Full arrangement</li>
+            <li><strong>*-poly-X-Y</strong>: X against Y polyrhythm</li>
+        </ul>
+        <p>To expand a macro:</p>
+        <ul>
+            <li>Type a macro on a line and press <strong>Tab</strong> to expand it</li>
+            <li>Or place cursor on a line with a macro and press <strong>Ctrl+Space</strong></li>
+            <li>Or use the <strong>Debug Macros</strong> button to find and expand macros</li>
+        </ul>
+    </div>
+    <div class="debug-panel" id="debug-panel"></div>
 </body>
 </html> 
