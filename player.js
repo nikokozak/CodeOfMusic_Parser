@@ -9,6 +9,7 @@ const player = {
     parts: new Map(),           // Track -> Part mapping
     trackStates: new Map(),     // Track -> active state mapping
     currentArrangementId: null, // Currently active arrangement ID
+    masterLimiter: null,        // Master limiter to prevent clipping
     
     // Default sample mapping
     samples: {
@@ -39,6 +40,10 @@ const player = {
         this.parts.clear();
         this.trackStates.clear();
         
+        // Create a master limiter to prevent clipping
+        this.masterLimiter = new Tone.Limiter(-1).toDestination();
+        console.log('Created master limiter');
+        
         // Set default tempo and loop length
         this.transport.bpm.value = data.tempo || 120;
         
@@ -51,19 +56,33 @@ const player = {
         
         for (const [name, path] of Object.entries(this.samples)) {
             try {
-                const player = new Tone.Player({
-                    url: path,
-                    onload: () => console.log(`Loaded ${name}`),
-                    onerror: (e) => console.error(`Error loading ${name}:`, e)
-                }).toDestination();
+                // Create a proper loading promise for each sample
+                const loadPromise = new Promise((resolve, reject) => {
+                    const player = new Tone.Player({
+                        url: path,
+                        onload: () => {
+                            console.log(`Loaded ${name}`);
+                            // Add small fade-in/fade-out to reduce pops and clicks
+                            player.fadeIn = 0.005; // 5ms fade in
+                            player.fadeOut = 0.01; // 10ms fade out
+                            resolve(); // Resolve promise when sample is actually loaded
+                        },
+                        onerror: (e) => {
+                            console.error(`Error loading ${name}:`, e);
+                            reject(e);
+                        }
+                    }).connect(this.masterLimiter); // Connect to limiter instead of destination
+                    
+                    this.players.set(name, player);
+                    
+                    // Add a timeout as a fallback
+                    setTimeout(() => {
+                        console.warn(`Sample ${name} load timed out, continuing anyway`);
+                        resolve();
+                    }, 5000);
+                });
                 
-                this.players.set(name, player);
-                loadPromises.push(new Promise((resolve, reject) => {
-                    player.onstop = resolve;
-                    player.onerror = reject;
-                    // Add timeout in case the sample never loads
-                    setTimeout(resolve, 5000);
-                }));
+                loadPromises.push(loadPromise);
             } catch (err) {
                 console.error(`Failed to create player for ${name}:`, err);
             }
@@ -86,6 +105,9 @@ const player = {
         } catch (err) {
             console.warn('Some samples failed to load, continuing anyway:', err);
         }
+        
+        // Ensure audio context is started
+        await Tone.start();
         
         // Finalize initialization
         await Tone.loaded();
@@ -110,35 +132,35 @@ const player = {
             
             switch (lowerType) {
                 case 'synth':
-                    synth = new Tone.Synth().toDestination();
+                    synth = new Tone.Synth().connect(this.masterLimiter);
                     break;
                 case 'amsynth':
-                    synth = new Tone.AMSynth().toDestination();
+                    synth = new Tone.AMSynth().connect(this.masterLimiter);
                     break;
                 case 'fmsynth':
-                    synth = new Tone.FMSynth().toDestination();
+                    synth = new Tone.FMSynth().connect(this.masterLimiter);
                     break;
                 case 'monosynth':
-                    synth = new Tone.MonoSynth().toDestination();
+                    synth = new Tone.MonoSynth().connect(this.masterLimiter);
                     break;
                 case 'polysynth':
-                    synth = new Tone.PolySynth().toDestination();
+                    synth = new Tone.PolySynth().connect(this.masterLimiter);
                     break;
                 case 'pluck':
-                    synth = new Tone.PluckSynth().toDestination();
+                    synth = new Tone.PluckSynth().connect(this.masterLimiter);
                     break;
                 case 'membrane':
-                    synth = new Tone.MembraneSynth().toDestination();
+                    synth = new Tone.MembraneSynth().connect(this.masterLimiter);
                     break;
                 case 'metal':
-                    synth = new Tone.MetalSynth().toDestination();
+                    synth = new Tone.MetalSynth().connect(this.masterLimiter);
                     break;
                 case 'noise':
-                    synth = new Tone.NoiseSynth().toDestination();
+                    synth = new Tone.NoiseSynth().connect(this.masterLimiter);
                     break;
                 default:
                     // Default to basic Synth
-                    synth = new Tone.Synth().toDestination();
+                    synth = new Tone.Synth().connect(this.masterLimiter);
                     console.warn(`Unknown synth type '${synthType}', defaulting to Synth`);
             }
             
@@ -166,8 +188,9 @@ const player = {
                 return;
             }
             
-            // Apply velocity to synth volume
-            synth.volume.value = (velocity - 0.7) * 20; // Map 0-1 velocity to reasonable dB range
+            // Apply velocity to synth volume with ramping to prevent pops
+            const volumeValue = (velocity - 0.7) * 20; // Map 0-1 velocity to reasonable dB range
+            synth.volume.rampTo(volumeValue, 0.01); // 10ms ramp to prevent clicks
             
             // Handle both single notes and chords
             if (Array.isArray(note)) {
@@ -372,7 +395,7 @@ const player = {
                             // Apply volume adjustments
                             const noteVolume = event.volume || 0;
                             const combinedVolume = noteVolume + (event.trackVolume / 10) + (event.arrangementVolume / 10);
-                            synth.volume.value = combinedVolume * 20;
+                            synth.volume.rampTo(combinedVolume * 20, 0.01); // Use ramping instead of direct assignment
                             
                             // Determine note duration - use event duration if available, otherwise default to "8n"
                             const duration = event.duration ? 
@@ -394,18 +417,16 @@ const player = {
                                 player.playbackRate = 1;
                             }
                             
-                            // Apply combined volume adjustment:
-                            // 1. Note volume (-1 to 1)
-                            // 2. Track volume (-10 to 10)
-                            // 3. Arrangement volume (-10 to 10)
-                            // Convert to dB scale for Tone.js
+                            // Apply combined volume adjustment with ramping to prevent pops
                             const noteVolume = event.volume || 0;
                             const combinedVolume = noteVolume + (event.trackVolume / 10) + (event.arrangementVolume / 10);
                             
-                            // Scale to a reasonable dB range (-40dB to +6dB)
-                            player.volume.value = combinedVolume * 20;
+                            // Scale to a reasonable dB range (-40dB to +6dB) with ramping
+                            player.volume.rampTo(combinedVolume * 20, 0.01); // 10ms ramp
                             
-                            player.start(time);
+                            // Add a tiny random offset to prevent multiple samples starting at exact same time
+                            const tinyOffset = Math.random() * 0.005; // 0-5ms random offset
+                            player.start(time + tinyOffset);
                         } else {
                             console.warn(`Player not found for sample: ${event.sample}`);
                         }
@@ -524,7 +545,7 @@ const player = {
                             // Apply volume adjustments
                             const noteVolume = event.volume || 0;
                             const combinedVolume = noteVolume + (event.trackVolume / 10) + (event.arrangementVolume / 10);
-                            synth.volume.value = combinedVolume * 20;
+                            synth.volume.rampTo(combinedVolume * 20, 0.01); // Use ramping instead of direct assignment
                             
                             // Determine note duration - use event duration if available, otherwise default to "8n"
                             const duration = event.duration ? 
@@ -546,18 +567,16 @@ const player = {
                                 player.playbackRate = 1;
                             }
                             
-                            // Apply combined volume adjustment:
-                            // 1. Note volume (-1 to 1)
-                            // 2. Track volume (-10 to 10)
-                            // 3. Arrangement volume (-10 to 10)
-                            // Convert to dB scale for Tone.js
+                            // Apply combined volume adjustment with ramping to prevent pops
                             const noteVolume = event.volume || 0;
                             const combinedVolume = noteVolume + (event.trackVolume / 10) + (event.arrangementVolume / 10);
                             
-                            // Scale to a reasonable dB range
-                            player.volume.value = combinedVolume * 20;
+                            // Scale to a reasonable dB range (-40dB to +6dB) with ramping
+                            player.volume.rampTo(combinedVolume * 20, 0.01); // 10ms ramp
                             
-                            player.start(time);
+                            // Add a tiny random offset to prevent multiple samples starting at exact same time
+                            const tinyOffset = Math.random() * 0.005; // 0-5ms random offset
+                            player.start(time + tinyOffset);
                         } else {
                             console.warn(`Player not found for sample: ${event.sample}`);
                         }
